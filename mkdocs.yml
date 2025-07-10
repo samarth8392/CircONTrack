@@ -46,22 +46,10 @@ nav:
   - Home: index.md
   - Getting Started:
     - Installation: installation.md
-    - Quick Start: quickstart.md
   - User Guide:
-    - Overview: overview.md
-    - Command Line Usage: cli.md
-    - Python API: api.md
-    - Configuration: configuration.md
+    - Overview: pipeline_overview.md
   - Algorithm:
-    - Detection Pipeline: algorithm.md
     - Workflow Diagram: workflow.md
-  - Examples:
-    - Basic Usage: examples/basic.md
-    - Advanced Usage: examples/advanced.md
-  - Output Format: output.md
-  - FAQ: faq.md
-  - Contributing: contributing.md
-  - Changelog: changelog.md
 
 # Extensions
 markdown_extensions:
