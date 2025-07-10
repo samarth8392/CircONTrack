@@ -1,10 +1,3 @@
-# Making Your Package Available on GitHub
-
-## 1. Prepare Your Repository Files
-
-### Create a comprehensive `README.md`
-
-```markdown
 # circDNA Detection
 
 ONT-optimized circular DNA detection via multi-modal analysis combining coverage patterns, junction detection, and split-read analysis.
