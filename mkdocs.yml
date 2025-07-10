@@ -3,7 +3,7 @@ site_name: circDNA Detection
 site_description: ONT-optimized circular DNA detection via multi-modal analysis
 site_author: Samarth Mathur
 site_url: https://samarth8392.github.io/circDNA_detection/
-repo_name: samarth8392/circDNA_detection
+repo_name: circDNA_detection
 repo_url: https://github.com/samarth8392/circDNA_detection
 edit_uri: edit/main/docs/
 
@@ -76,7 +76,7 @@ markdown_extensions:
       custom_fences:
         - name: mermaid
           class: mermaid
-          format: !!python/name:pymdownx.superfences.fence_code_format
+          format: !!python/name:pymdownx.superfences.fence_div_format
   - pymdownx.tabbed
   - pymdownx.tasklist:
       custom_checkbox: true
@@ -87,7 +87,7 @@ extra_css:
   - css/extra.css
 
 extra_javascript:
-  - https://cdnjs.cloudflare.com/ajax/libs/mermaid/8.13.8/mermaid.min.js
+  - https://cdn.jsdelivr.net/npm/mermaid@10.4.0/dist/mermaid.min.js
   - js/extra.js
 
 # Plugins
@@ -99,7 +99,9 @@ plugins:
 # Extra information
 extra:
   social:
+    - icon: fontawesome/solid/users
+      link: https://samarth8392.github.io
     - icon: fontawesome/brands/github
       link: https://github.com/samarth8392
-  version:
-    provider: mike
+  # version:
+  #   provider: git
