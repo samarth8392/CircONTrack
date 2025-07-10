@@ -2,18 +2,21 @@
 """
 Split Read Analysis for Circular DNA Detection
 Analyzes supplementary alignments to identify circular DNA junctions
+Updated with confidence scoring system integration
 """
 
 import pysam
 import numpy as np
 from collections import defaultdict
 from .utils import CircularCandidate
+from .confidence_scorer import ConfidenceScorer
 
 class SplitReadAnalyzer:
     def __init__(self, min_split_length=50, min_support=3, max_distance=1000):
         self.min_split_length = min_split_length
         self.min_support = min_support
         self.max_distance = max_distance
+        self.confidence_scorer = ConfidenceScorer()
     
     def analyze_split_reads(self, bam_file, chromosome=None):
         """Analyze split reads to detect circular DNA junctions"""
@@ -153,18 +156,29 @@ class SplitReadAnalyzer:
                 length = end - start
                 
                 if 200 <= length <= 100000:
-                    candidate = CircularCandidate(
-                        chromosome=chromosome,
-                        start=start,
-                        end=end,
-                        length=length,
-                        split_support=len(supporting_reads),
-                        confidence_score=0.0,
-                        detection_method='split_read'
+                    candidate = self._create_candidate_with_confidence(
+                        chromosome, start, end, length, len(supporting_reads)
                     )
                     candidates.append(candidate)
         
         return candidates
+    
+    def _create_candidate_with_confidence(self, chromosome, start, end, length, split_support):
+        """Create candidate with proper confidence scoring"""
+        candidate = CircularCandidate(
+            chromosome=chromosome,
+            start=start,
+            end=end,
+            length=length,
+            split_support=split_support,
+            confidence_score=0.0,  # Will be calculated below
+            detection_method='split_read'
+        )
+        
+        # Calculate confidence score
+        candidate.confidence_score = self.confidence_scorer.calculate_confidence(candidate)
+        
+        return candidate
     
     def _estimate_boundaries_from_splits(self, supporting_reads):
         """Estimate circular DNA boundaries from split read alignments"""
