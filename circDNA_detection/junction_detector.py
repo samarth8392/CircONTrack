@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Circular DNA Junction Detection
+Circular DNA Junction Detection with Confidence Scoring
 Detects back-to-back junctions characteristic of circular DNA
 """
 
@@ -8,11 +8,13 @@ import pysam
 import numpy as np
 from collections import defaultdict, Counter
 from .utils import CircularCandidate
+from .confidence_scorer import ConfidenceScorer
 
 class JunctionDetector:
     def __init__(self, min_support=3, max_junction_distance=1000):
         self.min_support = min_support
         self.max_junction_distance = max_junction_distance
+        self.confidence_scorer = ConfidenceScorer()
     
     def detect_junctions(self, bam_file, chromosome=None):
         """Detect circular DNA junctions from discordant read pairs"""
@@ -115,18 +117,29 @@ class JunctionDetector:
                 
                 # Filter by reasonable size
                 if 200 <= length <= 100000:
-                    candidate = CircularCandidate(
-                        chromosome=chromosome,
-                        start=start,
-                        end=end,
-                        length=length,
-                        junction_support=junction_support,
-                        confidence_score=0.0,
-                        detection_method='junction'
+                    candidate = self._create_candidate_with_confidence(
+                        chromosome, start, end, length, junction_support
                     )
                     candidates.append(candidate)
         
         return candidates
+    
+    def _create_candidate_with_confidence(self, chromosome, start, end, length, junction_support):
+        """Create candidate with proper confidence scoring"""
+        candidate = CircularCandidate(
+            chromosome=chromosome,
+            start=start,
+            end=end,
+            length=length,
+            junction_support=junction_support,
+            confidence_score=0.0,  # Will be calculated below
+            detection_method='junction'
+        )
+        
+        # Calculate confidence score
+        candidate.confidence_score = self.confidence_scorer.calculate_confidence(candidate)
+        
+        return candidate
     
     def _cluster_positions(self, positions, max_distance=500):
         """Cluster nearby positions"""
