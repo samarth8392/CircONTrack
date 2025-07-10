@@ -188,7 +188,3 @@ To remove circDNA Detection:
 ```bash
 pip uninstall circDNA-detection
 ```
-
-## Next Steps
-
-After successful installation, proceed to the [Quick Start](quickstart.md) guide to begin using circDNA Detection.
