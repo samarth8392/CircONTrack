@@ -418,11 +418,7 @@ def main():
     parser.add_argument('--min-coverage', type=int, default=5)
     parser.add_argument('--min-length', type=int, default=200)
     parser.add_argument('--max-length', type=int, default=100000)
-    parser.add_argument('-v', '--verbose', action='store_true', 
-                   help='Enable verbose output with progress bars')
-    parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'], 
-                   default='INFO', help='Set logging level')
-    
+
     args = parser.parse_args()
     
     # Create detector with enhanced options
