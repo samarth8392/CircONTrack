@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `circDNA_detection` package by samarth8392 is a Python tool specifically designed for detecting circular DNA elements in Oxford Nanopore Technologies (ONT) long-read sequencing data. The package employs a multi-modal approach that combines three complementary detection methods to achieve high sensitivity and specificity.
+The `circDNA_detection` is a Python tool specifically designed for detecting circular DNA elements in Oxford Nanopore Technologies (ONT) long-read sequencing data. The package employs a multi-modal approach that combines three complementary detection methods to achieve high sensitivity and specificity.
 
 ## Package Architecture
 
@@ -28,7 +28,8 @@ The package implements a comprehensive detection pipeline that consists of four 
 - Filters based on minimum coverage depth (default: 5x)
 
 **Implementation Logic Assessment**: 
-✅ **Sound Logic**: This approach leverages the fact that circular DNA elements often show increased coverage due to their amplified nature. The fold-enrichment calculation provides a normalized measure that accounts for varying sequencing depths across samples.
+
+This approach leverages the fact that circular DNA elements often show increased coverage due to due to rolling circle amplification. The fold-enrichment calculation provides a normalized measure that accounts for varying sequencing depths across samples.
 
 ### 2. Junction Detection
 
@@ -40,7 +41,7 @@ The package implements a comprehensive detection pipeline that consists of four 
 - Validates junction signatures through read orientation analysis
 
 **Implementation Logic Assessment**:
-✅ **Sound Logic**: Junction detection is a gold standard for circular DNA identification. The back-to-back signature is a definitive indicator of circular topology, as linear DNA cannot produce such patterns.
+Junction detection is a gold standard for circular DNA identification. The back-to-back signature is a definitive indicator of circular topology, as linear DNA cannot produce such patterns.
 
 ### 3. Split-Read Analysis
 
@@ -52,7 +53,7 @@ The package implements a comprehensive detection pipeline that consists of four 
 - Validates split-read patterns consistent with circular DNA structure
 
 **Implementation Logic Assessment**:
-✅ **Sound Logic**: Split-read analysis is particularly powerful for ONT data due to the long read lengths. Reads spanning circular junctions will often show split alignments, providing additional evidence for circular structure.
+Split-read analysis is particularly powerful for ONT data due to the long read lengths. Reads spanning circular junctions will often show split alignments, providing additional evidence for circular structure.
 
 ### 4. Multi-Modal Integration
 
@@ -78,27 +79,6 @@ The package implements a comprehensive detection pipeline that consists of four 
 | `min_length` | 200 | Minimum circular DNA length | ✅ Excludes very small artifacts while capturing biologically relevant circles |
 | `max_length` | 100,000 | Maximum circular DNA length | ✅ Reasonable upper bound for most circular DNA elements |
 
-## API Design
-
-### Command Line Interface
-```bash
-circDNA-detect input.bam reference.fasta -o output.bed
-```
-
-### Python API
-```python
-from circDNA_detection import CircularDNADetector
-
-detector = CircularDNADetector(
-    min_fold_enrichment=1.5,
-    min_coverage=5,
-    min_length=200
-)
-candidates = detector.detect_circular_dna("input.bam", "reference.fasta")
-```
-
-**API Logic Assessment**:
-✅ **Well-Designed**: The API provides both command-line and programmatic access, making it suitable for both standalone use and integration into larger pipelines.
 
 ## Output Format
 
@@ -107,9 +87,6 @@ The package outputs results in BED format with additional columns:
 - Detection method information
 - Confidence scores
 - Additional details
-
-**Output Logic Assessment**:
-✅ **Standard and Extensible**: Using BED format ensures compatibility with standard genomics tools while providing additional annotation for circular DNA-specific information.
 
 ## Strengths of the Implementation
 
@@ -131,12 +108,3 @@ The package outputs results in BED format with additional columns:
 - pysam ≥ 0.19.0 (for BAM/SAM file handling)
 - numpy ≥ 1.19.0 (for numerical computations)
 - scipy ≥ 1.6.0 (for statistical analysis)
-
-**Dependency Logic Assessment**:
-✅ **Appropriate**: The dependencies are well-chosen for the task. pysam is essential for BAM handling, while numpy and scipy provide the computational foundation for coverage analysis and statistical computations.
-
-## Overall Assessment
-
-The `circDNA_detection` package appears to implement a scientifically sound approach to circular DNA detection in ONT data. The multi-modal strategy combining coverage analysis, junction detection, and split-read analysis is methodologically robust and well-suited for the characteristics of long-read sequencing data. The configurable parameters and standard output format make it practical for integration into genomics workflows.
-
-The logic within each detection method is consistent with established principles of circular DNA identification, and the combination of multiple evidence types should provide good specificity while maintaining sensitivity for detecting biologically relevant circular DNA elements.
