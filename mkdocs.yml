@@ -48,8 +48,10 @@ nav:
     - Installation: installation.md
   - User Guide:
     - Overview: pipeline_overview.md
+    - Pipeline: pipeline_flowchart.md
   - Algorithm:
-    - Workflow Diagram: workflow.md
+    - Workflow: workflow.md
+    
 
 # Extensions
 markdown_extensions:
