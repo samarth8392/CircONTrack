@@ -10,6 +10,7 @@ from collections import defaultdict
 from scipy.signal import find_peaks
 from scipy.stats import median_abs_deviation
 from .utils import CircularCandidate
+from .confidence_scorer import ConfidenceScorer
 
 class CoverageAnalyzer:
     def __init__(self, window_sizes=[100, 500, 1000], min_fold_enrichment=1.5, 
@@ -101,8 +102,12 @@ class CoverageAnalyzer:
         return coverage_data
     
     def _find_coverage_peaks(self, coverage_values, positions, threshold, baseline, window_size, chromosome):
-        """Find coverage peaks using local background subtraction"""
+        """Find coverage peaks using local background subtraction WITH CONFIDENCE SCORING"""
         candidates = []
+        
+        # Initialize confidence scorer
+        if not hasattr(self, 'confidence_scorer'):
+            self.confidence_scorer = ConfidenceScorer()
         
         # Apply local background subtraction
         local_bg = self._calculate_local_background(coverage_values, window_size=10)
@@ -145,7 +150,7 @@ class CoverageAnalyzer:
             fold_enrichment = region_median / max(flanking_bg, 1)
             uniformity = 1 - (region_mad / max(region_median, 1))
             
-            # Create candidate
+            # Create candidate with proper confidence scoring
             candidate = CircularCandidate(
                 chromosome=chromosome,
                 start=genomic_start,
@@ -154,9 +159,12 @@ class CoverageAnalyzer:
                 mean_coverage=region_median,
                 fold_enrichment=fold_enrichment,
                 coverage_uniformity=uniformity,
-                confidence_score=0.0,
+                confidence_score=0.0,  # Will be calculated below
                 detection_method='coverage'
             )
+            
+            # CALCULATE CONFIDENCE SCORE
+            candidate.confidence_score = self.confidence_scorer.calculate_confidence(candidate)
             
             candidates.append(candidate)
         
@@ -236,3 +244,120 @@ class CoverageAnalyzer:
         
         consolidated.append(current)
         return consolidated
+
+class ConfidenceScorer:
+    """Confidence scoring system for CircDNA candidates"""
+    
+    def __init__(self):
+        self.weights = {
+            'coverage': {
+                'fold_enrichment': 0.4,
+                'coverage_uniformity': 0.3,
+                'mean_coverage': 0.3
+            },
+            'junction': {
+                'junction_support': 0.8,
+                'base_confidence': 0.2
+            },
+            'split_read': {
+                'split_support': 0.8,
+                'base_confidence': 0.2
+            }
+        }
+        
+        self.thresholds = {
+            'max_fold_enrichment': 5.0,
+            'max_coverage': 20.0,
+            'max_junction_support': 10.0,
+            'max_split_support': 10.0
+        }
+    
+    def calculate_confidence(self, candidate):
+        """Calculate confidence score based on available evidence"""
+        if candidate.detection_method == 'coverage':
+            return self._calculate_coverage_confidence(candidate)
+        elif candidate.detection_method == 'junction':
+            return self._calculate_junction_confidence(candidate)
+        elif candidate.detection_method == 'split_read':
+            return self._calculate_split_read_confidence(candidate)
+        elif '+' in candidate.detection_method:
+            return self._calculate_multi_method_confidence(candidate)
+        else:
+            return 0.1
+    
+    def _calculate_coverage_confidence(self, candidate):
+        """Calculate confidence for coverage-based detection"""
+        score = 0.0
+        weights = self.weights['coverage']
+        
+        # Fold enrichment component
+        if candidate.fold_enrichment is not None:
+            fold_score = min(candidate.fold_enrichment / self.thresholds['max_fold_enrichment'], 1.0)
+            score += fold_score * weights['fold_enrichment']
+        
+        # Coverage uniformity component
+        if candidate.coverage_uniformity is not None:
+            uniformity_score = max(0, candidate.coverage_uniformity)
+            score += uniformity_score * weights['coverage_uniformity']
+        
+        # Mean coverage component
+        if candidate.mean_coverage is not None:
+            coverage_score = min(candidate.mean_coverage / self.thresholds['max_coverage'], 1.0)
+            score += coverage_score * weights['mean_coverage']
+        
+        return min(score, 1.0)
+    
+    def _calculate_junction_confidence(self, candidate):
+        """Calculate confidence for junction-based detection"""
+        score = 0.0
+        weights = self.weights['junction']
+        
+        if candidate.junction_support is not None:
+            support_score = min(candidate.junction_support / self.thresholds['max_junction_support'], 1.0)
+            score += support_score * weights['junction_support']
+        
+        score += weights['base_confidence']
+        return min(score, 1.0)
+    
+    def _calculate_split_read_confidence(self, candidate):
+        """Calculate confidence for split-read detection"""
+        score = 0.0
+        weights = self.weights['split_read']
+        
+        if candidate.split_support is not None:
+            support_score = min(candidate.split_support / self.thresholds['max_split_support'], 1.0)
+            score += support_score * weights['split_support']
+        
+        score += weights['base_confidence']
+        return min(score, 1.0)
+    
+    def _calculate_multi_method_confidence(self, candidate):
+        """Calculate confidence for multi-method detection"""
+        methods = candidate.detection_method.split('+')
+        method_scores = []
+        
+        for method in methods:
+            temp_candidate = CircularCandidate(
+                chromosome=candidate.chromosome,
+                start=candidate.start,
+                end=candidate.end,
+                length=candidate.length,
+                detection_method=method,
+                mean_coverage=candidate.mean_coverage,
+                fold_enrichment=candidate.fold_enrichment,
+                coverage_uniformity=candidate.coverage_uniformity,
+                junction_support=candidate.junction_support,
+                split_support=candidate.split_support
+            )
+            method_scores.append(self.calculate_confidence(temp_candidate))
+        
+        if len(method_scores) == 1:
+            return method_scores[0]
+        elif len(method_scores) == 2:
+            base_score = sum(method_scores) / len(method_scores)
+            bonus = 0.2 * min(method_scores)
+            return min(base_score + bonus, 1.0)
+        else:
+            base_score = sum(method_scores) / len(method_scores)
+            bonus = 0.3 * min(method_scores)
+            return min(base_score + bonus, 1.0)
