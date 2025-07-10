@@ -11,7 +11,7 @@ import pysam
 import numpy as np
 from datetime import datetime
 
-class VerboseCircularDNADetector:
+class CircularDNADetector:
     """Enhanced detector with comprehensive progress tracking and verbose output"""
     
     def __init__(self, min_fold_enrichment=1.5, min_coverage=5, min_length=200, 
@@ -426,7 +426,7 @@ def main():
     args = parser.parse_args()
     
     # Create detector with enhanced options
-    detector = VerboseCircularDNADetector(
+    detector = CircularDNADetector(
         min_fold_enrichment=args.min_fold_enrichment,
         min_coverage=args.min_coverage,
         min_length=args.min_length,
