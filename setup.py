@@ -1,45 +1,37 @@
-#!/usr/bin/env python3
 from setuptools import setup, find_packages
 
-# Read README file
-try:
-    with open("README.md", "r", encoding="utf-8") as fh:
-        long_description = fh.read()
-except FileNotFoundError:
-    long_description = " Circular DNA Tracking and Detection via ONT-based Multi-modal Signal Integration"
+with open("README.md", "r", encoding="utf-8") as fh:
+    long_description = fh.read()
 
 setup(
-    name="CircONTrack",  # Note: using hyphen for PyPI name
-    version="1.0.0",
+    name="CircONTrack",
+    version="0.1.0",
     author="Samarth Mathur, PhD",
     author_email="samarth8392@gmail.com",
-    description=" Circular DNA Tracking and Detection via ONT-based Multi-modal Signal Integration",
+    description="Circular DNA Tracking and Detection via ONT-based Multi-modal Signal Integration",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/samarth8392/circDNA_detection",
+    url="https://github.com/samarth8392/CircONTrack",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Science/Research",
-        "License :: OSI Approved :: MIT License",
-        "Operating System :: OS Independent",
-        "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
-        "Programming Language :: Python :: 3.10",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
+        "License :: OSI Approved :: MIT License",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.10",
     install_requires=[
         "pysam>=0.19.0",
         "numpy>=1.19.0",
         "scipy>=1.6.0",
+        "tqdm>=4.60.0",  # Added tqdm dependency
     ],
     entry_points={
         "console_scripts": [
             "circontrack=circDNA_detection.circular_dna_detector:main",
         ],
     },
-    include_package_data=True,
 )
