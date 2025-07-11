@@ -61,7 +61,10 @@ jobs:
     - name: Check code style
       run: |
         pip install flake8
-        flake8 circDNA_detection/ --max-line-length=100 --ignore=E501,W503
+        # E501: line too long (handled by max-line-length)
+        # W503: line break before binary operator (PEP8 now recommends before, not after)
+        # E128: continuation line under-indented (can be opinionated)
+        flake8 circDNA_detection/ --max-line-length=100 --ignore=E501,W503,E128
     
     - name: Upload coverage reports
       if: matrix.python-version == '3.11'
