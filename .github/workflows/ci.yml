@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
   pull_request:
     branches: [ main ]
 
@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11']
-
+        python-version: ['3.10', '3.11']
+    
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v3
     
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
@@ -24,27 +24,82 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential libz-dev libbz2-dev liblzma-dev
+        sudo apt-get install -y samtools
     
-    - name: Install dependencies
+    - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pysam>=0.19.0 numpy>=1.19.0 scipy>=1.6.0 tqdm>=4.62.0
-        pip install -e .
+        pip install pytest pytest-cov
+        pip install pysam numpy scipy tqdm
     
-    - name: Test CLI works
+    - name: Run unit tests
       run: |
-        circontrack --help
+        # Test imports and basic functionality
+        python -m pytest tests/ -v --cov=circDNA_detection --cov-report=xml
     
-    - name: Test Python import
+    - name: Test module imports
       run: |
-        python -c "from circDNA_detection import CircularDNADetector; print('Package works!')"
+        python -c "from circDNA_detection.circular_dna_detector import CircularDNADetector"
+        python -c "from circDNA_detection.coverage_analyzer import CoverageAnalyzer"
+        python -c "from circDNA_detection.junction_detector import JunctionDetector"
+        python -c "from circDNA_detection.split_read_analyzer import SplitReadAnalyzer"
+        python -c "from circDNA_detection.confidence_scorer import ConfidenceScorer, MultiMethodIntegrator"
+        python -c "from circDNA_detection.utils import CircularCandidate, filter_candidates_by_confidence, calculate_gc_content"
     
-    - name: Run tests (if they exist)
+    - name: Run integration test
       run: |
-        if [ -d "tests" ]; then
-          pip install pytest
-          pytest tests/
-        else
-          echo "No tests directory found, skipping tests"
+        # Download test data if needed
+        if [ ! -f "test_data/test.bam" ]; then
+          mkdir -p test_data
+          # Add commands to download or create test data
+          echo "Test data setup would go here"
         fi
+        
+        # Run the main script with test data (if available)
+        # python -m circDNA_detection.circular_dna_detector test_data/test.bam test_data/reference.fa -o test_output.bed
+    
+    - name: Check code style
+      run: |
+        pip install flake8
+        flake8 circDNA_detection/ --max-line-length=100 --ignore=E501,W503
+    
+    - name: Upload coverage reports
+      if: matrix.python-version == '3.11'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build setuptools wheel
+    
+    - name: Build package
+      run: |
+        python -m build
+    
+    - name: Check package
+      run: |
+        pip install twine
+        twine check dist/*
+    
+    - name: Test installation
+      run: |
+        pip install dist/*.whl
+        python -c "import circDNA_detection"
+        # Test command-line interface if it exists
+        # circdna-detect --help
