@@ -7,27 +7,38 @@ Analyzes supplementary alignments to identify circular DNA junctions
 import pysam
 import numpy as np
 from collections import defaultdict
+from tqdm import tqdm
+import sys
 from .utils import CircularCandidate
 
 
 class SplitReadAnalyzer:
     """Analyzes split reads to detect circular DNA junctions"""
     
-    def __init__(self, min_split_length=50, min_support=3, max_distance=1000):
+    def __init__(self, min_split_length=50, min_support=3, max_distance=1000, verbose=True):
         self.min_split_length = min_split_length
         self.min_support = min_support
         self.max_distance = max_distance
+        self.verbose = verbose
     
     def analyze_split_reads(self, bam_file, chromosome=None):
         """Analyze split reads to detect circular DNA junctions"""
-        print("  Analyzing split reads...")
+        if self.verbose:
+            print("  Analyzing split reads...")
         
         split_candidates = []
         
         with pysam.AlignmentFile(bam_file, "rb") as bam:
             chromosomes = [chromosome] if chromosome else bam.references
             
-            for chrom in chromosomes:
+            # Create chromosome progress bar
+            chr_progress = tqdm(chromosomes, 
+                              desc="Split-read analysis", 
+                              disable=not self.verbose,
+                              file=sys.stdout)
+            
+            for chrom in chr_progress:
+                chr_progress.set_description(f"Split-read analysis - {chrom}")
                 splits = self._collect_split_alignments(bam, chrom)
                 candidates = self._analyze_split_patterns(splits, chrom)
                 split_candidates.extend(candidates)

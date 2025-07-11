@@ -37,10 +37,11 @@ class CircularDNADetector:
         # Initialize detection modules
         self.coverage_analyzer = CoverageAnalyzer(
             min_fold_enrichment=min_fold_enrichment,
-            min_coverage=min_coverage
+            min_coverage=min_coverage,
+            verbose=verbose
         )
-        self.junction_detector = JunctionDetector()
-        self.split_analyzer = SplitReadAnalyzer()
+        self.junction_detector = JunctionDetector(verbose=verbose)
+        self.split_analyzer = SplitReadAnalyzer(verbose=verbose)
         
         # Initialize scoring and integration modules
         self.confidence_scorer = ConfidenceScorer()

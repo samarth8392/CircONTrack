@@ -7,26 +7,37 @@ Detects back-to-back junctions characteristic of circular DNA
 import pysam
 import numpy as np
 from collections import defaultdict, Counter
+from tqdm import tqdm
+import sys
 from .utils import CircularCandidate
 
 
 class JunctionDetector:
     """Detects circular DNA junctions from discordant read pairs"""
     
-    def __init__(self, min_support=3, max_junction_distance=1000):
+    def __init__(self, min_support=3, max_junction_distance=1000, verbose=True):
         self.min_support = min_support
         self.max_junction_distance = max_junction_distance
+        self.verbose = verbose
     
     def detect_junctions(self, bam_file, chromosome=None):
         """Detect circular DNA junctions from discordant read pairs"""
-        print("  Detecting junctions...")
+        if self.verbose:
+            print("  Detecting junctions...")
         
         junction_candidates = []
         
         with pysam.AlignmentFile(bam_file, "rb") as bam:
             chromosomes = [chromosome] if chromosome else bam.references
             
-            for chrom in chromosomes:
+            # Create chromosome progress bar
+            chr_progress = tqdm(chromosomes, 
+                              desc="Junction detection", 
+                              disable=not self.verbose,
+                              file=sys.stdout)
+            
+            for chrom in chr_progress:
+                chr_progress.set_description(f"Junction detection - {chrom}")
                 junctions = self._find_chromosome_junctions(bam, chrom)
                 candidates = self._cluster_junctions(junctions, chrom)
                 junction_candidates.extend(candidates)

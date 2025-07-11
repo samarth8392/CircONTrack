@@ -9,6 +9,8 @@ import numpy as np
 from collections import defaultdict
 from scipy.signal import find_peaks
 from scipy.stats import median_abs_deviation
+from tqdm import tqdm
+import sys
 from .utils import CircularCandidate
 
 
@@ -16,11 +18,12 @@ class CoverageAnalyzer:
     """Coverage-based circular DNA detection using multi-scale analysis"""
     
     def __init__(self, window_sizes=[100, 500, 1000], min_fold_enrichment=1.5, 
-                 min_coverage=5, uniformity_threshold=0.4):
+                 min_coverage=5, uniformity_threshold=0.4, verbose=True):
         self.window_sizes = window_sizes
         self.min_fold_enrichment = min_fold_enrichment
         self.min_coverage = min_coverage
         self.uniformity_threshold = uniformity_threshold
+        self.verbose = verbose
     
     def detect_coverage_patterns(self, bam_file, chromosome=None):
         """Multi-scale coverage pattern detection"""
@@ -29,8 +32,14 @@ class CoverageAnalyzer:
         with pysam.AlignmentFile(bam_file, "rb") as bam:
             chromosomes = [chromosome] if chromosome else bam.references
             
-            for chrom in chromosomes:
-                print(f"  Analyzing {chrom}...")
+            # Create chromosome progress bar
+            chr_progress = tqdm(chromosomes, 
+                              desc="Coverage analysis", 
+                              disable=not self.verbose,
+                              file=sys.stdout)
+            
+            for chrom in chr_progress:
+                chr_progress.set_description(f"Coverage analysis - {chrom}")
                 
                 # Multi-scale analysis
                 for window_size in self.window_sizes:
