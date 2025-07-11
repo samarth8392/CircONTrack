@@ -221,39 +221,42 @@ class CircularDNADetector:
         return all_candidates
     
     def _analyze_coverage(self, bam, chromosome, chr_length):
-        """Use the proper CoverageAnalyzer instead of broken built-in method"""
+        """Analyze coverage patterns using the proper CoverageAnalyzer"""
         self.current_step += 1
         self.log_step(f"  → Phase 1: Coverage analysis for {chromosome}")
-        
-        # Initialize the proper coverage analyzer with your parameters
-        if not hasattr(self, 'coverage_analyzer'):
-            self.coverage_analyzer = CoverageAnalyzer(
-                window_sizes=[1000, 5000],  # Multi-scale analysis
-                min_fold_enrichment=self.min_fold_enrichment,
-                min_coverage=self.min_coverage,
-                uniformity_threshold=0.4
-            )
-        
-        # Use the proper analyzer
-        candidates = self.coverage_analyzer._analyze_chromosome_coverage(
-            bam, chromosome, 5000  # Use 5kb windows
+                
+        # Create coverage analyzer with your parameters
+        coverage_analyzer = CoverageAnalyzer(
+            window_sizes=[1000],  # or use multiple: [500, 1000, 2000]
+            min_fold_enrichment=self.min_fold_enrichment,
+            min_coverage=self.min_coverage,
+            uniformity_threshold=0.4
         )
         
-        # Convert CircularCandidate objects to dict format for compatibility
+        # Use the proper coverage analysis
+        candidates = coverage_analyzer._analyze_chromosome_coverage(
+            bam, chromosome, window_size=1000
+        )
+        
+        # Convert CircularCandidate objects to the expected dictionary format
         dict_candidates = []
         for cand in candidates:
-            dict_candidates.append({
-                'chr': cand.chromosome,
-                'start': cand.start,
-                'end': cand.end,
-                'length': cand.length,
-                'coverage': cand.mean_coverage,
-                'fold_enrichment': cand.fold_enrichment,
-                'coverage_uniformity': cand.coverage_uniformity,
-                'method': 'coverage'
-            })
+            # Only include candidates that meet your criteria
+            if (cand.confidence_score >= 0.3 and  # Add confidence threshold
+                cand.fold_enrichment >= self.min_fold_enrichment and
+                cand.mean_coverage >= self.min_coverage):
+                
+                dict_candidates.append({
+                    'chr': cand.chromosome,
+                    'start': cand.start,
+                    'end': cand.end,
+                    'coverage': cand.mean_coverage,
+                    'fold_enrichment': cand.fold_enrichment,
+                    'confidence_score': cand.confidence_score,
+                    'method': 'coverage'
+                })
         
-        self.log_step(f"  → Coverage analysis complete: {len(dict_candidates)} regions found")
+        self.log_step(f"  → Coverage analysis complete: {len(dict_candidates)} high-confidence regions found")
         return dict_candidates
     
     def _detect_junctions(self, bam, chromosome):
