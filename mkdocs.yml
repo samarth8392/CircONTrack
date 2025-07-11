@@ -1,10 +1,10 @@
 # MkDocs configuration for circDNA_detection documentation
-site_name: circDNA Detection
-site_description: ONT-optimized circular DNA detection via multi-modal analysis
+site_name: CircONTrack
+site_description:  Circular DNA Tracking and Detection via ONT-based Multi-modal Signal Integration
 site_author: Samarth Mathur
-site_url: https://samarth8392.github.io/circDNA_detection/
+site_url: https://samarth8392.github.io/CircONTrack/
 repo_name: circDNA_detection
-repo_url: https://github.com/samarth8392/circDNA_detection
+repo_url: https://github.com/samarth8392/CircONTrack
 edit_uri: edit/main/docs/
 
 # Theme configuration

@@ -6,14 +6,14 @@ try:
     with open("README.md", "r", encoding="utf-8") as fh:
         long_description = fh.read()
 except FileNotFoundError:
-    long_description = "ONT-optimized circular DNA detection via multi-modal analysis"
+    long_description = " Circular DNA Tracking and Detection via ONT-based Multi-modal Signal Integration"
 
 setup(
-    name="circDNA-detection",  # Note: using hyphen for PyPI name
+    name="CircONTrack",  # Note: using hyphen for PyPI name
     version="1.0.0",
     author="Samarth Mathur, PhD",
     author_email="samarth8392@gmail.com",
-    description="ONT-optimized circular DNA detection via multi-modal analysis",
+    description=" Circular DNA Tracking and Detection via ONT-based Multi-modal Signal Integration",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/samarth8392/circDNA_detection",
@@ -38,7 +38,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "circDNA-detect=circDNA_detection.circular_dna_detector:main",
+            "circontrack=circDNA_detection.circular_dna_detector:main",
         ],
     },
     include_package_data=True,

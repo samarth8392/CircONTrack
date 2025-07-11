@@ -1,4 +1,4 @@
-# circDNA Detection
+# CircONTrack
 
 ONT-optimized circular DNA detection via multi-modal analysis combining coverage patterns, junction detection, and split-read analysis.
 
@@ -37,7 +37,7 @@ pip install -e .
 ### Command Line
 
 ```bash
-circDNA-detect input.bam reference.fasta -o output.bed
+circontrack input.bam reference.fasta -o output.bed
 ```
 
 ### Python API
