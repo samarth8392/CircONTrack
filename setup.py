@@ -28,6 +28,7 @@ setup(
         "numpy>=1.19.0",
         "scipy>=1.6.0",
         "tqdm>=4.60.0",  # Added tqdm dependency
+        "rich>=10.0.0",  # Added rich dependency for console output
     ],
     entry_points={
         "console_scripts": [

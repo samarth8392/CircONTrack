@@ -30,7 +30,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install pytest pytest-cov
-        pip install pysam numpy scipy tqdm
+        pip install pysam numpy scipy tqdm rich
     
     - name: Run unit tests
       run: |

@@ -10,6 +10,8 @@ import argparse
 from tqdm import tqdm
 import pysam
 import numpy as np
+from rich.console import Console
+from rich.text import Text
 
 # Import detection modules
 from .coverage_analyzer import CoverageAnalyzer
@@ -17,6 +19,36 @@ from .junction_detector import JunctionDetector
 from .split_read_analyzer import SplitReadAnalyzer
 from .confidence_scorer import ConfidenceScorer, MultiMethodIntegrator
 from .utils import filter_candidates_by_confidence, calculate_gc_content
+
+# Initialize rich console
+console = Console()
+
+def print_banner():
+    """Print ASCII banner"""
+    banner = """
+ 
+
+  _______ __           _______ ______  _______                 __               
+ |   _   |__.----.----|   _   |   _  \|       .----.---.-.----|  |--.-----.----.
+ |.  1___|  |   _|  __|.  |   |.  |   |.|   | |   _|  _  |  __|    <|  -__|   _|
+ |.  |___|__|__| |____|.  |   |.  |   `-|.  |-|__| |___._|____|__|__|_____|__|  
+ |:  1   |            |:  1   |:  |   | |:  |                                   
+ |::.. . |            |::.. . |::.|   | |::.|                                   
+ `-------'            `-------`--- ---' `---'                                   
+                                                                                
+                                                                                                                            
+    Circular DNA Tracking and Detection via ONT-based Multi-modal Signal Integration
+    """
+    
+    # Print banner with gradient colors
+    lines = banner.strip().split('\n')
+    for i, line in enumerate(lines):
+        if i < 6:  # ASCII art lines
+            console.print(line, style=f"bold cyan")
+        else:  # Description line
+            console.print(line, style="bold white", justify="center")
+    
+    console.print()
 
 
 class CircularDNADetector:
@@ -220,28 +252,28 @@ class CircularDNADetector:
         """Print comprehensive summary"""
         elapsed_time = time.time() - start_time
         
-        print("\n" + "="*60)
-        print("CIRCULAR DNA DETECTION SUMMARY")
-        print("="*60)
+        console.print("\n" + "="*60, style="bold cyan")
+        console.print("CIRCULAR DNA DETECTION SUMMARY", style="bold white", justify="center")
+        console.print("="*60, style="bold cyan")
         
-        print(f"Raw candidates found:")
-        print(f"  Coverage-based: {len(coverage_cands)}")
-        print(f"  Junction-based: {len(junction_cands)}")
-        print(f"  Split-read based: {len(split_cands)}")
-        print(f"  Total raw: {len(coverage_cands) + len(junction_cands) + len(split_cands)}")
+        console.print(f"Raw candidates found:", style="bold yellow")
+        console.print(f"  Coverage-based: {len(coverage_cands)}")
+        console.print(f"  Junction-based: {len(junction_cands)}")
+        console.print(f"  Split-read based: {len(split_cands)}")
+        console.print(f"  Total raw: {len(coverage_cands) + len(junction_cands) + len(split_cands)}")
         
-        print(f"\nAfter multi-method integration: {len(integrated_cands)}")
-        print(f"After confidence filtering (≥{self.min_confidence:.2f}): {len(final_cands)}")
+        console.print(f"\nAfter multi-method integration: {len(integrated_cands)}", style="bold green")
+        console.print(f"After confidence filtering (≥{self.min_confidence:.2f}): {len(final_cands)}", style="bold green")
         
         if final_cands:
-            print(f"\nTop 5 candidates by confidence:")
+            console.print(f"\nTop 5 candidates by confidence:", style="bold magenta")
             for i, candidate in enumerate(final_cands[:5]):
-                print(f"  {i+1}. {candidate.chromosome}:{candidate.start}-{candidate.end}")
-                print(f"     Confidence: {candidate.confidence_score:.3f}")
-                print(f"     Method: {candidate.detection_method}")
-                print(f"     Length: {candidate.length:,} bp")
+                console.print(f"  {i+1}. {candidate.chromosome}:{candidate.start}-{candidate.end}", style="bold white")
+                console.print(f"     Confidence: {candidate.confidence_score:.3f}", style="cyan")
+                console.print(f"     Method: {candidate.detection_method}", style="yellow")
+                console.print(f"     Length: {candidate.length:,} bp", style="green")
                 if candidate.gc_content is not None:
-                    print(f"     GC content: {candidate.gc_content:.1%}")
+                    console.print(f"     GC content: {candidate.gc_content:.1%}", style="blue")
                 
                 # Show contributing evidence
                 evidence = []
@@ -253,15 +285,18 @@ class CircularDNADetector:
                     evidence.append(f"splits={candidate.split_support}")
                 
                 if evidence:
-                    print(f"     Evidence: {', '.join(evidence)}")
-                print()
+                    console.print(f"     Evidence: {', '.join(evidence)}", style="dim white")
+                console.print()
         
-        print(f"\nAnalysis completed in: {elapsed_time:.2f} seconds")
-        print("="*60)
+        console.print(f"\nAnalysis completed in: {elapsed_time:.2f} seconds", style="bold green")
+        console.print("="*60, style="bold cyan")
 
 
 def main():
     """Main function with argument parsing"""
+    # Print banner
+    print_banner()
+    
     parser = argparse.ArgumentParser(
         description='Detect circular DNA from ONT sequencing data using multi-modal analysis'
     )
@@ -308,8 +343,8 @@ def main():
         args.chromosome
     )
     
-    print(f"\nAnalysis complete! Results written to {args.output}")
-    print(f"Found {len(results)} high-confidence circular DNA candidates")
+    console.print(f"\nAnalysis complete! Results written to {args.output}", style="bold green")
+    console.print(f"Found {len(results)} high-confidence circular DNA candidates", style="bold green")
 
 
 if __name__ == "__main__":
