@@ -19,36 +19,29 @@ from .junction_detector import JunctionDetector
 from .split_read_analyzer import SplitReadAnalyzer
 from .confidence_scorer import ConfidenceScorer, MultiMethodIntegrator
 from .utils import filter_candidates_by_confidence, calculate_gc_content
+from . import __version__
 
 # Initialize rich console
 console = Console()
 
 def print_banner():
     """Print ASCII banner"""
-    banner = """
- 
+    banner = f"""
+    [cyan]
+   _____ _           ____  _   _ _______             _             
+  / ____(_)         / __ \| \ | |__   __|           | |            
+ | |     _ _ __ ___| |  | |  \| |  | |_ __ __ _  ___| | _____ _ __ 
+ | |    | | '__/ __| |  | | . ` |  | | '__/ _` |/ __| |/ / _ \ '__|
+ | |____| | | | (__| |__| | |\  |  | | | | (_| | (__|   <  __/ |   
+  \_____|_|_|  \___|\____/|_| \_|  |_|_|  \__,_|\___|_|\_\___|_|   
 
-  _______ __           _______ ______  _______                 __               
- |   _   |__.----.----|   _   |   _  \|       .----.---.-.----|  |--.-----.----.
- |.  1___|  |   _|  __|.  |   |.  |   |.|   | |   _|  _  |  __|    <|  -__|   _|
- |.  |___|__|__| |____|.  |   |.  |   `-|.  |-|__| |___._|____|__|__|_____|__|  
- |:  1   |            |:  1   |:  |   | |:  |                                   
- |::.. . |            |::.. . |::.|   | |::.|                                   
- `-------'            `-------`--- ---' `---'                                   
-                                                                                
-                                                                                                                            
-    Circular DNA Tracking and Detection via ONT-based Multi-modal Signal Integration
-    """
-    
-    # Print banner with gradient colors
-    lines = banner.strip().split('\n')
-    for i, line in enumerate(lines):
-        if i < 6:  # ASCII art lines
-            console.print(line, style=f"bold cyan")
-        else:  # Description line
-            console.print(line, style="bold white", justify="center")
-    
-    console.print()
+    [/cyan]
+
+    [white] Circular DNA Tracking and Detection via ONT-based Multi-modal Signal Integration [/white]
+
+    [magenta] [bold] Version:  {__version__} [/bold] [/magenta] 
+    """    
+    console.print(banner)
 
 
 class CircularDNADetector:
