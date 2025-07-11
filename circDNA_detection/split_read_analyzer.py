@@ -49,7 +49,21 @@ class SplitReadAnalyzer:
         """Collect split read alignments for analysis"""
         split_reads = defaultdict(list)
         
-        for read in bam.fetch(chromosome):
+        # Get total reads for progress bar (if verbose)
+        if self.verbose:
+            total_reads = bam.count(chromosome)
+            read_progress = tqdm(
+                bam.fetch(chromosome),
+                desc=f"  → Scanning for split reads in {chromosome}",
+                total=total_reads,
+                disable=not self.verbose,
+                file=sys.stdout,
+                leave=False
+            )
+        else:
+            read_progress = bam.fetch(chromosome)
+        
+        for read in read_progress:
             if read.is_unmapped or read.is_secondary:
                 continue
             
@@ -80,6 +94,12 @@ class SplitReadAnalyzer:
                         },
                         'supplementary': valid_supplements
                     })
+        
+        if hasattr(read_progress, 'close'):
+            read_progress.close()
+            
+        if self.verbose:
+            print(f"    Found {len(split_reads)} reads with split alignments")
         
         return split_reads
     

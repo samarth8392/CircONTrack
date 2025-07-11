@@ -56,6 +56,9 @@ class CoverageAnalyzer:
         if chrom_length < window_size * 10:
             return []
         
+        if self.verbose:
+            print(f"  → Analyzing {chromosome} with {window_size}bp windows (length: {chrom_length:,}bp)")
+        
         # Calculate coverage in windows
         coverage_data = self._calculate_windowed_coverage(
             bam, chromosome, window_size, chrom_length
@@ -91,7 +94,20 @@ class CoverageAnalyzer:
         """Calculate coverage in sliding windows with local normalization"""
         coverage_data = []
         
-        for start in range(0, chrom_length, window_size):
+        # Calculate number of windows for progress bar
+        num_windows = (chrom_length + window_size - 1) // window_size
+        
+        # Create progress bar for window analysis
+        window_progress = tqdm(
+            range(0, chrom_length, window_size),
+            desc=f"  → Processing {window_size}bp windows",
+            total=num_windows,
+            disable=not self.verbose,
+            file=sys.stdout,
+            leave=False
+        )
+        
+        for start in window_progress:
             end = min(start + window_size, chrom_length)
             
             # Count reads with mapping quality filter
@@ -109,7 +125,15 @@ class CoverageAnalyzer:
                 'coverage': normalized_coverage,
                 'raw_count': count
             })
+            
+            # Update progress description periodically
+            if len(coverage_data) % 1000 == 0:
+                window_progress.set_postfix({
+                    'windows': len(coverage_data),
+                    'avg_cov': f"{np.mean([d['coverage'] for d in coverage_data[-100:]]):.1f}"
+                })
         
+        window_progress.close()
         return coverage_data
     
     def _find_coverage_peaks(self, coverage_values, positions, threshold, baseline, window_size, chromosome):

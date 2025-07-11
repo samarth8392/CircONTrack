@@ -48,7 +48,21 @@ class JunctionDetector:
         """Find potential circular junctions in chromosome"""
         junctions = defaultdict(list)
         
-        for read in bam.fetch(chromosome):
+        # Get total reads for progress bar (if verbose)
+        if self.verbose:
+            total_reads = bam.count(chromosome)
+            read_progress = tqdm(
+                bam.fetch(chromosome),
+                desc=f"  → Scanning reads in {chromosome}",
+                total=total_reads,
+                disable=not self.verbose,
+                file=sys.stdout,
+                leave=False
+            )
+        else:
+            read_progress = bam.fetch(chromosome)
+        
+        for read in read_progress:
             if (read.is_unmapped or read.mate_is_unmapped or 
                 read.is_secondary or read.is_supplementary):
                 continue
@@ -62,6 +76,12 @@ class JunctionDetector:
                     junction_pos = read.reference_end
                 
                 junctions[junction_pos].append(read)
+        
+        if hasattr(read_progress, 'close'):
+            read_progress.close()
+            
+        if self.verbose:
+            print(f"    Found {len(junctions)} potential junction points")
         
         return junctions
     
