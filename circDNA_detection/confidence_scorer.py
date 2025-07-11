@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """
-CircDNA Pipeline with Proper Confidence Scoring System
-Fixes the missing confidence scoring issue identified in the analysis
+Confidence Scoring and Multi-Method Integration for Circular DNA Detection
 """
 
 import numpy as np
-from typing import List, Dict, Tuple
-from dataclasses import dataclass
+from typing import List
 from .utils import CircularCandidate
+
 
 class ConfidenceScorer:
     """
@@ -116,6 +115,7 @@ class ConfidenceScorer:
         method_scores = []
         
         for method in methods:
+            # Create temporary candidate with single method for scoring
             temp_candidate = CircularCandidate(
                 chromosome=candidate.chromosome,
                 start=candidate.start,
@@ -130,7 +130,7 @@ class ConfidenceScorer:
             )
             method_scores.append(self.calculate_confidence(temp_candidate))
         
-        # Combine scores with diminishing returns
+        # Combine scores with bonus for multi-method support
         if len(method_scores) == 1:
             return method_scores[0]
         elif len(method_scores) == 2:
@@ -145,93 +145,6 @@ class ConfidenceScorer:
             return min(base_score + bonus, 1.0)
 
 
-# Updated detection modules with confidence scoring
-
-class UpdatedCoverageAnalyzer:
-    """Coverage analyzer with confidence scoring"""
-    
-    def __init__(self, window_sizes=[100, 500, 1000], min_fold_enrichment=1.5, 
-                 min_coverage=5, uniformity_threshold=0.4):
-        self.window_sizes = window_sizes
-        self.min_fold_enrichment = min_fold_enrichment
-        self.min_coverage = min_coverage
-        self.uniformity_threshold = uniformity_threshold
-        self.confidence_scorer = ConfidenceScorer()
-    
-    def _create_candidate_with_confidence(self, chromosome, start, end, length, 
-                                        mean_coverage, fold_enrichment, coverage_uniformity):
-        """Create candidate with proper confidence scoring"""
-        candidate = CircularCandidate(
-            chromosome=chromosome,
-            start=start,
-            end=end,
-            length=length,
-            mean_coverage=mean_coverage,
-            fold_enrichment=fold_enrichment,
-            coverage_uniformity=coverage_uniformity,
-            confidence_score=0.0,  # Will be calculated below
-            detection_method='coverage'
-        )
-        
-        # Calculate confidence score
-        candidate.confidence_score = self.confidence_scorer.calculate_confidence(candidate)
-        
-        return candidate
-
-
-class UpdatedJunctionDetector:
-    """Junction detector with confidence scoring"""
-    
-    def __init__(self, min_support=3, max_junction_distance=1000):
-        self.min_support = min_support
-        self.max_junction_distance = max_junction_distance
-        self.confidence_scorer = ConfidenceScorer()
-    
-    def _create_candidate_with_confidence(self, chromosome, start, end, length, junction_support):
-        """Create candidate with proper confidence scoring"""
-        candidate = CircularCandidate(
-            chromosome=chromosome,
-            start=start,
-            end=end,
-            length=length,
-            junction_support=junction_support,
-            confidence_score=0.0,  # Will be calculated below
-            detection_method='junction'
-        )
-        
-        # Calculate confidence score
-        candidate.confidence_score = self.confidence_scorer.calculate_confidence(candidate)
-        
-        return candidate
-
-
-class UpdatedSplitReadAnalyzer:
-    """Split read analyzer with confidence scoring"""
-    
-    def __init__(self, min_split_length=50, min_support=3, max_distance=1000):
-        self.min_split_length = min_split_length
-        self.min_support = min_support
-        self.max_distance = max_distance
-        self.confidence_scorer = ConfidenceScorer()
-    
-    def _create_candidate_with_confidence(self, chromosome, start, end, length, split_support):
-        """Create candidate with proper confidence scoring"""
-        candidate = CircularCandidate(
-            chromosome=chromosome,
-            start=start,
-            end=end,
-            length=length,
-            split_support=split_support,
-            confidence_score=0.0,  # Will be calculated below
-            detection_method='split_read'
-        )
-        
-        # Calculate confidence score
-        candidate.confidence_score = self.confidence_scorer.calculate_confidence(candidate)
-        
-        return candidate
-
-
 class MultiMethodIntegrator:
     """
     Integrates candidates from multiple detection methods
@@ -239,7 +152,6 @@ class MultiMethodIntegrator:
     
     def __init__(self, max_overlap_distance=1000):
         self.max_overlap_distance = max_overlap_distance
-        self.confidence_scorer = ConfidenceScorer()
     
     def integrate_candidates(self, coverage_candidates: List[CircularCandidate],
                            junction_candidates: List[CircularCandidate],
@@ -258,14 +170,13 @@ class MultiMethodIntegrator:
         # Merge overlapping candidates
         merged_candidates = self._merge_overlapping_candidates(all_candidates)
         
-        # Recalculate confidence scores for merged candidates
-        for candidate in merged_candidates:
-            candidate.confidence_score = self.confidence_scorer.calculate_confidence(candidate)
-        
         return merged_candidates
     
     def _merge_overlapping_candidates(self, candidates: List[CircularCandidate]) -> List[CircularCandidate]:
         """Merge overlapping candidates from different methods"""
+        if not candidates:
+            return []
+        
         merged = []
         current = candidates[0]
         
@@ -317,10 +228,11 @@ class MultiMethodIntegrator:
             end=end,
             length=end - start,
             detection_method=method_str,
-            confidence_score=0.0  # Will be calculated later
+            confidence_score=0.0  # Will be calculated later by ConfidenceScorer
         )
         
         # Combine evidence from both candidates
+        # Take the maximum values for coverage-related metrics
         merged.mean_coverage = max(
             c1.mean_coverage or 0, c2.mean_coverage or 0
         ) or None
@@ -333,6 +245,7 @@ class MultiMethodIntegrator:
             c1.coverage_uniformity or 0, c2.coverage_uniformity or 0
         ) or None
         
+        # Sum the support counts
         merged.junction_support = (
             (c1.junction_support or 0) + (c2.junction_support or 0)
         ) or None
@@ -342,182 +255,3 @@ class MultiMethodIntegrator:
         ) or None
         
         return merged
-
-
-class UpdatedCircularDNADetector:
-    """
-    Main detector with proper confidence scoring and multi-method integration
-    """
-    
-    def __init__(self, min_fold_enrichment=1.5, min_coverage=5, min_length=200, 
-                 max_length=100000, min_confidence=0.3, verbose=False):
-        self.min_fold_enrichment = min_fold_enrichment
-        self.min_coverage = min_coverage
-        self.min_length = min_length
-        self.max_length = max_length
-        self.min_confidence = min_confidence
-        self.verbose = verbose
-        
-        # Initialize analyzers
-        self.coverage_analyzer = UpdatedCoverageAnalyzer(
-            min_fold_enrichment=min_fold_enrichment,
-            min_coverage=min_coverage
-        )
-        self.junction_detector = UpdatedJunctionDetector()
-        self.split_analyzer = UpdatedSplitReadAnalyzer()
-        self.integrator = MultiMethodIntegrator()
-    
-    def detect_circular_dna(self, bam_file, reference_file, output_file=None, 
-                          chromosome=None):
-        """
-        Main detection pipeline with confidence scoring
-        """
-        if self.verbose:
-            print("Starting CircDNA detection with confidence scoring...")
-        
-        # Run individual detection methods
-        coverage_candidates = self.coverage_analyzer.detect_coverage_patterns(
-            bam_file, chromosome
-        )
-        
-        junction_candidates = self.junction_detector.detect_junctions(
-            bam_file, chromosome
-        )
-        
-        split_candidates = self.split_analyzer.analyze_split_reads(
-            bam_file, chromosome
-        )
-        
-        # Integrate results
-        integrated_candidates = self.integrator.integrate_candidates(
-            coverage_candidates, junction_candidates, split_candidates
-        )
-        
-        # Filter by confidence threshold
-        high_confidence_candidates = [
-            c for c in integrated_candidates 
-            if c.confidence_score >= self.min_confidence
-        ]
-        
-        # Sort by confidence score (descending)
-        final_candidates = sorted(
-            high_confidence_candidates, 
-            key=lambda x: x.confidence_score, 
-            reverse=True
-        )
-        
-        if output_file:
-            self._write_output_with_confidence(final_candidates, output_file)
-        
-        if self.verbose:
-            self._print_confidence_summary(
-                coverage_candidates, junction_candidates, split_candidates, 
-                integrated_candidates, final_candidates
-            )
-        
-        return final_candidates
-    
-    def _write_output_with_confidence(self, candidates, output_file):
-        """Write results with proper confidence scores"""
-        with open(output_file, 'w') as f:
-            f.write("# CircDNA Detection Results with Confidence Scores\n")
-            f.write("# chr\tstart\tend\tname\tconfidence\tstrand\tmethod\tlength\n")
-            
-            for i, candidate in enumerate(candidates):
-                f.write(f"{candidate.chromosome}\t{candidate.start}\t{candidate.end}\t"
-                       f"circDNA_{i+1}\t{candidate.confidence_score:.3f}\t.\t"
-                       f"{candidate.detection_method}\t{candidate.length}\n")
-    
-    def _print_confidence_summary(self, coverage_cands, junction_cands, split_cands, 
-                                integrated_cands, final_cands):
-        """Print comprehensive confidence scoring summary"""
-        print("\n" + "="*60)
-        print("CONFIDENCE SCORING SUMMARY")
-        print("="*60)
-        
-        print(f"Raw candidates found:")
-        print(f"  Coverage-based: {len(coverage_cands)}")
-        print(f"  Junction-based: {len(junction_cands)}")
-        print(f"  Split-read based: {len(split_cands)}")
-        print(f"  Total raw: {len(coverage_cands) + len(junction_cands) + len(split_cands)}")
-        
-        print(f"\nAfter multi-method integration: {len(integrated_cands)}")
-        print(f"After confidence filtering (≥{self.min_confidence:.2f}): {len(final_cands)}")
-        
-        if final_cands:
-            print(f"\nTop 5 candidates by confidence:")
-            for i, candidate in enumerate(final_cands[:5]):
-                print(f"  {i+1}. {candidate.chromosome}:{candidate.start}-{candidate.end}")
-                print(f"     Confidence: {candidate.confidence_score:.3f}")
-                print(f"     Method: {candidate.detection_method}")
-                print(f"     Length: {candidate.length:,} bp")
-                
-                # Show contributing evidence
-                evidence = []
-                if candidate.fold_enrichment:
-                    evidence.append(f"fold={candidate.fold_enrichment:.1f}")
-                if candidate.junction_support:
-                    evidence.append(f"junctions={candidate.junction_support}")
-                if candidate.split_support:
-                    evidence.append(f"splits={candidate.split_support}")
-                
-                if evidence:
-                    print(f"     Evidence: {', '.join(evidence)}")
-                print()
-        
-        print("="*60)
-
-
-# Example usage and testing
-def test_confidence_scoring():
-    """Test the confidence scoring system"""
-    scorer = ConfidenceScorer()
-    
-    # Test coverage-based candidate
-    coverage_candidate = CircularCandidate(
-        chromosome='chr1',
-        start=1000,
-        end=2000,
-        length=1000,
-        mean_coverage=15.0,
-        fold_enrichment=3.2,
-        coverage_uniformity=0.8,
-        detection_method='coverage'
-    )
-    
-    coverage_score = scorer.calculate_confidence(coverage_candidate)
-    print(f"Coverage candidate confidence: {coverage_score:.3f}")
-    
-    # Test junction-based candidate
-    junction_candidate = CircularCandidate(
-        chromosome='chr1',
-        start=1000,
-        end=2000,
-        length=1000,
-        junction_support=8,
-        detection_method='junction'
-    )
-    
-    junction_score = scorer.calculate_confidence(junction_candidate)
-    print(f"Junction candidate confidence: {junction_score:.3f}")
-    
-    # Test multi-method candidate
-    multi_candidate = CircularCandidate(
-        chromosome='chr1',
-        start=1000,
-        end=2000,
-        length=1000,
-        mean_coverage=12.0,
-        fold_enrichment=2.5,
-        coverage_uniformity=0.7,
-        junction_support=5,
-        split_support=3,
-        detection_method='coverage+junction+split_read'
-    )
-    
-    multi_score = scorer.calculate_confidence(multi_candidate)
-    print(f"Multi-method candidate confidence: {multi_score:.3f}")
-
-
-if __name__ == "__main__":
-    test_confidence_scoring()

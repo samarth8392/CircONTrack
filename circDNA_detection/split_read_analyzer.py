@@ -2,21 +2,21 @@
 """
 Split Read Analysis for Circular DNA Detection
 Analyzes supplementary alignments to identify circular DNA junctions
-Updated with confidence scoring system integration
 """
 
 import pysam
 import numpy as np
 from collections import defaultdict
 from .utils import CircularCandidate
-from .confidence_scorer import ConfidenceScorer
+
 
 class SplitReadAnalyzer:
+    """Analyzes split reads to detect circular DNA junctions"""
+    
     def __init__(self, min_split_length=50, min_support=3, max_distance=1000):
         self.min_split_length = min_split_length
         self.min_support = min_support
         self.max_distance = max_distance
-        self.confidence_scorer = ConfidenceScorer()
     
     def analyze_split_reads(self, bam_file, chromosome=None):
         """Analyze split reads to detect circular DNA junctions"""
@@ -117,31 +117,32 @@ class SplitReadAnalyzer:
         # Group split reads by junction points
         junction_groups = defaultdict(list)
         
-        for read_name, split_info in split_reads.items():
-            primary = split_info['primary']
-            
-            for supp in split_info['supplementary']:
-                # Calculate potential junction points
-                if primary['strand'] == '+':
-                    junction1 = primary['end']
-                else:
-                    junction1 = primary['start']
+        for read_name, split_info_list in split_reads.items():
+            for split_info in split_info_list:
+                primary = split_info['primary']
                 
-                if supp['strand'] == '+':
-                    junction2 = supp['position']
-                else:
-                    junction2 = supp['position'] + supp['length']
-                
-                # Check for circular pattern (back-to-back alignment)
-                if abs(junction1 - junction2) <= self.max_distance:
-                    junction_key = (min(junction1, junction2), max(junction1, junction2))
-                    junction_groups[junction_key].append({
-                        'read_name': read_name,
-                        'primary': primary,
-                        'supplementary': supp,
-                        'junction1': junction1,
-                        'junction2': junction2
-                    })
+                for supp in split_info['supplementary']:
+                    # Calculate potential junction points
+                    if primary['strand'] == '+':
+                        junction1 = primary['end']
+                    else:
+                        junction1 = primary['start']
+                    
+                    if supp['strand'] == '+':
+                        junction2 = supp['position']
+                    else:
+                        junction2 = supp['position'] + supp['length']
+                    
+                    # Check for circular pattern (back-to-back alignment)
+                    if abs(junction1 - junction2) <= self.max_distance:
+                        junction_key = (min(junction1, junction2), max(junction1, junction2))
+                        junction_groups[junction_key].append({
+                            'read_name': read_name,
+                            'primary': primary,
+                            'supplementary': supp,
+                            'junction1': junction1,
+                            'junction2': junction2
+                        })
         
         # Analyze junction groups
         for junction_key, supporting_reads in junction_groups.items():
@@ -156,29 +157,19 @@ class SplitReadAnalyzer:
                 length = end - start
                 
                 if 200 <= length <= 100000:
-                    candidate = self._create_candidate_with_confidence(
-                        chromosome, start, end, length, len(supporting_reads)
+                    # Create candidate WITHOUT confidence score
+                    candidate = CircularCandidate(
+                        chromosome=chromosome,
+                        start=start,
+                        end=end,
+                        length=length,
+                        split_support=len(supporting_reads),
+                        confidence_score=0.0,  # Placeholder - will be set by ConfidenceScorer
+                        detection_method='split_read'
                     )
                     candidates.append(candidate)
         
         return candidates
-    
-    def _create_candidate_with_confidence(self, chromosome, start, end, length, split_support):
-        """Create candidate with proper confidence scoring"""
-        candidate = CircularCandidate(
-            chromosome=chromosome,
-            start=start,
-            end=end,
-            length=length,
-            split_support=split_support,
-            confidence_score=0.0,  # Will be calculated below
-            detection_method='split_read'
-        )
-        
-        # Calculate confidence score
-        candidate.confidence_score = self.confidence_scorer.calculate_confidence(candidate)
-        
-        return candidate
     
     def _estimate_boundaries_from_splits(self, supporting_reads):
         """Estimate circular DNA boundaries from split read alignments"""
