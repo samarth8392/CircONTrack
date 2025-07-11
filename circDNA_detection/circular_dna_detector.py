@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-ONT-Optimized Circular DNA Detection via Multi-Modal Analysis
-Combines coverage patterns, junction detection, and split-read analysis
+FIXED CircONTrack Circular DNA Detector
+Integrates the sophisticated analysis modules that were missing from the main detector
 """
 import sys
 import time
@@ -9,494 +9,593 @@ import logging
 from tqdm import tqdm
 import pysam
 import numpy as np
-from .utils import CircularCandidate
-from .confidence_scorer import ConfidenceScorer
-from .coverage_analyzer import CoverageAnalyzer
+from scipy.stats import median_abs_deviation
+from scipy.signal import find_peaks
+from collections import defaultdict
+from dataclasses import dataclass
+from typing import List, Dict, Optional, Union
 
-class CircularDNADetector:
-    """Enhanced detector with comprehensive progress tracking and verbose output"""
+@dataclass
+class CircularCandidate:
+    """Data class for circular DNA candidates"""
+    chromosome: str
+    start: int
+    end: int
+    length: int
+    detection_method: str
+    confidence_score: float = 0.0
+    
+    # Coverage-based evidence
+    mean_coverage: Optional[float] = None
+    fold_enrichment: Optional[float] = None
+    coverage_uniformity: Optional[float] = None
+    
+    # Junction-based evidence
+    junction_support: Optional[int] = None
+    
+    # Split-read evidence
+    split_support: Optional[int] = None
+
+class ConfidenceScorer:
+    """Confidence scoring system for CircDNA candidates"""
+    
+    def __init__(self):
+        self.weights = {
+            'coverage': {
+                'fold_enrichment': 0.4,
+                'coverage_uniformity': 0.3,
+                'mean_coverage': 0.3
+            },
+            'junction': {
+                'junction_support': 0.8,
+                'base_confidence': 0.2
+            },
+            'split_read': {
+                'split_support': 0.8,
+                'base_confidence': 0.2
+            }
+        }
+        
+        self.thresholds = {
+            'max_fold_enrichment': 5.0,
+            'max_coverage': 20.0,
+            'max_junction_support': 10.0,
+            'max_split_support': 10.0
+        }
+    
+    def calculate_confidence(self, candidate: CircularCandidate) -> float:
+        """Calculate confidence score based on available evidence"""
+        if candidate.detection_method == 'coverage':
+            return self._calculate_coverage_confidence(candidate)
+        elif candidate.detection_method == 'junction':
+            return self._calculate_junction_confidence(candidate)
+        elif candidate.detection_method == 'split_read':
+            return self._calculate_split_read_confidence(candidate)
+        elif '+' in candidate.detection_method:
+            return self._calculate_multi_method_confidence(candidate)
+        else:
+            return 0.1
+    
+    def _calculate_coverage_confidence(self, candidate: CircularCandidate) -> float:
+        """Calculate confidence for coverage-based detection"""
+        score = 0.0
+        weights = self.weights['coverage']
+        
+        # Fold enrichment component (CRITICAL)
+        if candidate.fold_enrichment is not None:
+            fold_score = min(candidate.fold_enrichment / self.thresholds['max_fold_enrichment'], 1.0)
+            score += fold_score * weights['fold_enrichment']
+        
+        # Coverage uniformity component
+        if candidate.coverage_uniformity is not None:
+            uniformity_score = max(0, candidate.coverage_uniformity)
+            score += uniformity_score * weights['coverage_uniformity']
+        
+        # Mean coverage component
+        if candidate.mean_coverage is not None:
+            coverage_score = min(candidate.mean_coverage / self.thresholds['max_coverage'], 1.0)
+            score += coverage_score * weights['mean_coverage']
+        
+        return min(score, 1.0)
+    
+    def _calculate_junction_confidence(self, candidate: CircularCandidate) -> float:
+        """Calculate confidence for junction-based detection"""
+        score = 0.0
+        weights = self.weights['junction']
+        
+        if candidate.junction_support is not None:
+            support_score = min(candidate.junction_support / self.thresholds['max_junction_support'], 1.0)
+            score += support_score * weights['junction_support']
+        
+        score += weights['base_confidence']
+        return min(score, 1.0)
+    
+    def _calculate_split_read_confidence(self, candidate: CircularCandidate) -> float:
+        """Calculate confidence for split-read detection"""
+        score = 0.0
+        weights = self.weights['split_read']
+        
+        if candidate.split_support is not None:
+            support_score = min(candidate.split_support / self.thresholds['max_split_support'], 1.0)
+            score += support_score * weights['split_support']
+        
+        score += weights['base_confidence']
+        return min(score, 1.0)
+    
+    def _calculate_multi_method_confidence(self, candidate: CircularCandidate) -> float:
+        """Calculate confidence for multi-method detection"""
+        methods = candidate.detection_method.split('+')
+        method_scores = []
+        
+        for method in methods:
+            temp_candidate = CircularCandidate(
+                chromosome=candidate.chromosome,
+                start=candidate.start,
+                end=candidate.end,
+                length=candidate.length,
+                detection_method=method,
+                mean_coverage=candidate.mean_coverage,
+                fold_enrichment=candidate.fold_enrichment,
+                coverage_uniformity=candidate.coverage_uniformity,
+                junction_support=candidate.junction_support,
+                split_support=candidate.split_support
+            )
+            method_scores.append(self.calculate_confidence(temp_candidate))
+        
+        if len(method_scores) == 1:
+            return method_scores[0]
+        elif len(method_scores) == 2:
+            base_score = np.mean(method_scores)
+            bonus = 0.2 * min(method_scores)
+            return min(base_score + bonus, 1.0)
+        else:
+            base_score = np.mean(method_scores)
+            bonus = 0.3 * min(method_scores)
+            return min(base_score + bonus, 1.0)
+
+class ProperCoverageAnalyzer:
+    """FIXED Coverage analyzer with proper statistical analysis"""
+    
+    def __init__(self, window_sizes=[100, 500, 1000], min_fold_enrichment=1.5, 
+                 min_coverage=5, uniformity_threshold=0.4):
+        self.window_sizes = window_sizes
+        self.min_fold_enrichment = min_fold_enrichment
+        self.min_coverage = min_coverage
+        self.uniformity_threshold = uniformity_threshold
+        self.confidence_scorer = ConfidenceScorer()
+    
+    def analyze_coverage(self, bam, chromosome, verbose=False):
+        """PROPER coverage analysis with statistical methods"""
+        if verbose:
+            print(f"  → Analyzing coverage for {chromosome} using proper statistics")
+        
+        all_candidates = []
+        
+        # Multi-scale analysis
+        for window_size in self.window_sizes:
+            candidates = self._analyze_chromosome_coverage(
+                bam, chromosome, window_size, verbose
+            )
+            all_candidates.extend(candidates)
+        
+        # Consolidate overlapping candidates
+        consolidated = self._consolidate_candidates(all_candidates)
+        
+        if verbose:
+            print(f"  → Coverage analysis complete: {len(consolidated)} high-confidence candidates")
+        
+        return consolidated
+    
+    def _analyze_chromosome_coverage(self, bam, chromosome, window_size, verbose=False):
+        """Analyze coverage patterns for single chromosome at given window size"""
+        chrom_length = bam.get_reference_length(chromosome)
+        if chrom_length < window_size * 10:
+            return []
+        
+        # Calculate coverage in windows
+        coverage_data = self._calculate_windowed_coverage(
+            bam, chromosome, window_size, chrom_length, verbose
+        )
+        
+        if len(coverage_data) < 10:
+            return []
+        
+        # PROPER STATISTICAL ANALYSIS
+        coverage_values = np.array([w['coverage'] for w in coverage_data])
+        positions = np.array([w['start'] for w in coverage_data])
+        
+        # Use median and MAD for robust threshold calculation
+        median_cov = np.median(coverage_values)
+        mad_cov = median_abs_deviation(coverage_values)
+        
+        if median_cov < 1 or mad_cov == 0:
+            return []
+        
+        # CRITICAL: Proper fold enrichment threshold
+        fold_threshold = median_cov * self.min_fold_enrichment
+        robust_threshold = median_cov + 3 * mad_cov
+        threshold = max(fold_threshold, robust_threshold, self.min_coverage)
+        
+        if verbose:
+            print(f"    Window size {window_size}: median={median_cov:.1f}, "
+                  f"MAD={mad_cov:.1f}, threshold={threshold:.1f}")
+        
+        # Find peaks with proper background subtraction
+        candidates = self._find_coverage_peaks(
+            coverage_values, positions, threshold, median_cov, window_size, chromosome
+        )
+        
+        return candidates
+    
+    def _calculate_windowed_coverage(self, bam, chromosome, window_size, chrom_length, verbose):
+        """Calculate coverage in sliding windows with quality filtering"""
+        coverage_data = []
+        
+        progress_iter = range(0, chrom_length, window_size)
+        if verbose:
+            progress_iter = tqdm(progress_iter, desc=f"    Windows ({window_size}bp)", 
+                               leave=False, file=sys.stdout)
+        
+        for start in progress_iter:
+            end = min(start + window_size, chrom_length)
+            
+            # Count high-quality reads only
+            count = 0
+            for read in bam.fetch(chromosome, start, end):
+                if (read.mapping_quality >= 20 and 
+                    not read.is_secondary and 
+                    not read.is_duplicate and
+                    not read.is_unmapped):
+                    count += 1
+            
+            # Normalize by window size
+            normalized_coverage = count / (end - start) * window_size
+            
+            coverage_data.append({
+                'start': start,
+                'end': end,
+                'coverage': normalized_coverage,
+                'raw_count': count
+            })
+        
+        return coverage_data
+    
+    def _find_coverage_peaks(self, coverage_values, positions, threshold, baseline, window_size, chromosome):
+        """Find coverage peaks using proper peak detection algorithms"""
+        candidates = []
+        
+        # LOCAL BACKGROUND SUBTRACTION
+        local_bg = self._calculate_local_background(coverage_values, window_size=10)
+        adjusted_coverage = coverage_values - local_bg
+        
+        # PROPER PEAK DETECTION
+        peak_indices, peak_properties = find_peaks(
+            adjusted_coverage,
+            height=threshold - baseline,
+            distance=max(5, 500 // window_size),
+            width=max(2, 200 // window_size),
+            prominence=baseline * 0.5  # Require significant prominence
+        )
+        
+        for peak_idx in peak_indices:
+            # Define peak boundaries
+            start_idx, end_idx = self._find_peak_boundaries(
+                adjusted_coverage, peak_idx, baseline * 0.5
+            )
+            
+            # Convert to genomic coordinates
+            genomic_start = positions[start_idx]
+            genomic_end = positions[min(end_idx, len(positions)-1)] + window_size
+            region_length = genomic_end - genomic_start
+            
+            # Filter by length requirements
+            if region_length < 200 or region_length > 100000:
+                continue
+            
+            # Calculate region statistics
+            region_coverage = coverage_values[start_idx:end_idx+1]
+            region_median = np.median(region_coverage)
+            region_mad = median_abs_deviation(region_coverage)
+            
+            # Calculate flanking background
+            flanking_bg = self._calculate_flanking_background(
+                coverage_values, start_idx, end_idx, baseline
+            )
+            
+            # CRITICAL: Calculate actual fold enrichment
+            fold_enrichment = region_median / max(flanking_bg, 1)
+            
+            # Only keep candidates with sufficient fold enrichment
+            if fold_enrichment < self.min_fold_enrichment:
+                continue
+            
+            # Calculate uniformity score
+            uniformity = 1 - (region_mad / max(region_median, 1))
+            
+            # Create candidate with proper confidence scoring
+            candidate = CircularCandidate(
+                chromosome=chromosome,
+                start=genomic_start,
+                end=genomic_end,
+                length=region_length,
+                mean_coverage=region_median,
+                fold_enrichment=fold_enrichment,
+                coverage_uniformity=uniformity,
+                detection_method='coverage'
+            )
+            
+            # Calculate confidence score
+            candidate.confidence_score = self.confidence_scorer.calculate_confidence(candidate)
+            
+            candidates.append(candidate)
+        
+        return candidates
+    
+    def _calculate_local_background(self, coverage_values, window_size=10):
+        """Calculate local background using sliding median"""
+        local_bg = np.zeros_like(coverage_values)
+        
+        for i in range(len(coverage_values)):
+            start = max(0, i - window_size)
+            end = min(len(coverage_values), i + window_size + 1)
+            local_bg[i] = np.median(coverage_values[start:end])
+        
+        return local_bg
+    
+    def _find_peak_boundaries(self, coverage, peak_idx, threshold):
+        """Find peak boundaries using threshold crossing"""
+        # Left boundary
+        left_boundary = peak_idx
+        for i in range(peak_idx - 1, -1, -1):
+            if coverage[i] <= threshold:
+                left_boundary = i + 1
+                break
+            left_boundary = i
+        
+        # Right boundary
+        right_boundary = peak_idx
+        for i in range(peak_idx + 1, len(coverage)):
+            if coverage[i] <= threshold:
+                right_boundary = i - 1
+                break
+            right_boundary = i
+        
+        return left_boundary, right_boundary
+    
+    def _calculate_flanking_background(self, coverage, start_idx, end_idx, baseline):
+        """Calculate background coverage from flanking regions"""
+        region_size = end_idx - start_idx
+        flank_size = min(region_size, 20)
+        
+        # Left flank
+        left_start = max(0, start_idx - flank_size)
+        left_flank = coverage[left_start:start_idx]
+        
+        # Right flank
+        right_end = min(len(coverage), end_idx + flank_size)
+        right_flank = coverage[end_idx:right_end]
+        
+        # Combine flanks
+        flanking_values = np.concatenate([left_flank, right_flank])
+        
+        return np.median(flanking_values) if len(flanking_values) > 0 else baseline
+    
+    def _consolidate_candidates(self, candidates):
+        """Consolidate overlapping candidates from multi-scale analysis"""
+        if not candidates:
+            return []
+        
+        # Sort by position
+        candidates.sort(key=lambda x: (x.chromosome, x.start))
+        
+        consolidated = []
+        current = candidates[0]
+        
+        for candidate in candidates[1:]:
+            # Check for overlap
+            if (candidate.chromosome == current.chromosome and 
+                candidate.start <= current.end + 1000):
+                
+                # Keep candidate with higher confidence
+                if candidate.confidence_score > current.confidence_score:
+                    current = candidate
+            else:
+                consolidated.append(current)
+                current = candidate
+        
+        consolidated.append(current)
+        return consolidated
+
+class FixedCircularDNADetector:
+    """FIXED CircDNA detector using proper statistical analysis"""
     
     def __init__(self, min_fold_enrichment=1.5, min_coverage=5, min_length=200, 
-                 max_length=100000, verbose=True, log_level='INFO'):  # Changed default to True
+                 max_length=100000, min_confidence=0.3, verbose=True):
         self.min_fold_enrichment = min_fold_enrichment
         self.min_coverage = min_coverage
         self.min_length = min_length
         self.max_length = max_length
+        self.min_confidence = min_confidence
         self.verbose = verbose
         
+        # Initialize PROPER analyzers
+        self.coverage_analyzer = ProperCoverageAnalyzer(
+            min_fold_enrichment=min_fold_enrichment,
+            min_coverage=min_coverage
+        )
+        
+        self.confidence_scorer = ConfidenceScorer()
+        
         # Setup logging
-        self.setup_logging(log_level)
-        
-        # Progress tracking
-        self.total_steps = 0
-        self.current_step = 0
-        self.step_descriptions = []
-        
-    def setup_logging(self, log_level):
-        """Setup logging configuration"""
         logging.basicConfig(
-            level=getattr(logging, log_level.upper()),
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
+            level=logging.INFO if verbose else logging.WARNING,
+            format='%(asctime)s - %(levelname)s - %(message)s'
         )
         self.logger = logging.getLogger(__name__)
-        
-    def log_step(self, message, level='INFO'):
-        """Log a step with progress information"""
-        if self.verbose:
-            progress = f"[{self.current_step}/{self.total_steps}]" if self.total_steps > 0 else ""
-            getattr(self.logger, level.lower())(f"{progress} {message}")
-            
+    
     def detect_circular_dna(self, bam_file, reference_file, output_file=None, 
                           chromosome=None):
-        """
-        Main detection pipeline with comprehensive progress tracking
-        """
+        """FIXED detection pipeline with proper statistical analysis"""
         start_time = time.time()
-        self.log_step("Starting CircDNA detection pipeline", "INFO")
         
-        # Initialize progress tracking
-        self._initialize_progress_tracking(bam_file, chromosome)
+        if self.verbose:
+            print("="*60)
+            print("FIXED CircDNA Detection Pipeline")
+            print("="*60)
+            print(f"Parameters:")
+            print(f"  Min fold enrichment: {self.min_fold_enrichment}")
+            print(f"  Min coverage: {self.min_coverage}")
+            print(f"  Min length: {self.min_length}")
+            print(f"  Max length: {self.max_length}")
+            print(f"  Min confidence: {self.min_confidence}")
+            print()
         
-        try:
-            # Phase 1: File validation and setup
-            self._validate_inputs(bam_file, reference_file)
-            
-            # Phase 2: BAM file analysis
-            bam_stats = self._analyze_bam_file(bam_file)
-            
-            # Phase 3: Process each chromosome
-            candidates = self._process_chromosomes(bam_file, reference_file, chromosome)
-            
-            # Phase 4: Final processing and output
-            final_results = self._finalize_results(candidates, output_file)
-            
-            # Summary
-            self._print_summary(final_results, start_time)
-            
-            return final_results
-            
-        except Exception as e:
-            self.logger.error(f"Error in detection pipeline: {str(e)}")
-            raise
-    
-    def _initialize_progress_tracking(self, bam_file, chromosome):
-        """Initialize progress tracking based on input"""
-        self.log_step("Initializing progress tracking...")
+        # Validate inputs
+        self._validate_inputs(bam_file, reference_file)
         
-        # Estimate total steps based on input
-        if chromosome:
-            self.total_steps = 8  # Single chromosome
-        else:
-            # Estimate based on BAM file
-            try:
-                with pysam.AlignmentFile(bam_file, 'rb') as bam:
-                    num_chromosomes = len(bam.references)
-                    self.total_steps = 4 + (num_chromosomes * 4)  # Setup + per-chr steps
-            except:
-                self.total_steps = 50  # Default estimate
-                
-        self.current_step = 0
-        self.log_step(f"Estimated {self.total_steps} total steps")
-    
-    def _validate_inputs(self, bam_file, reference_file):
-        """Validate input files with progress updates"""
-        self.current_step += 1
-        self.log_step(f"Validating input files...")
-        
-        # Check BAM file
-        try:
-            with pysam.AlignmentFile(bam_file, 'rb') as bam:
-                if not bam.has_index():
-                    self.log_step("WARNING: BAM file is not indexed, this will be slow", "WARNING")
-                self.log_step(f"✓ BAM file validated: {bam_file}")
-        except Exception as e:
-            raise ValueError(f"Invalid BAM file: {str(e)}")
-        
-        # Check reference file
-        try:
-            with pysam.FastaFile(reference_file) as ref:
-                num_contigs = len(ref.references)
-                self.log_step(f"✓ Reference file validated: {reference_file} ({num_contigs} contigs)")
-        except Exception as e:
-            raise ValueError(f"Invalid reference file: {str(e)}")
-    
-    def _analyze_bam_file(self, bam_file):
-        """Analyze BAM file statistics with progress"""
-        self.current_step += 1
-        self.log_step("Analyzing BAM file statistics...")
-        
-        stats = {
-            'total_reads': 0,
-            'mapped_reads': 0,
-            'chromosomes': [],
-            'avg_coverage': 0
-        }
-        
-        with pysam.AlignmentFile(bam_file, 'rb') as bam:
-            # Get chromosome information
-            stats['chromosomes'] = list(bam.references)
-            self.log_step(f"Found {len(stats['chromosomes'])} chromosomes/contigs")
-            
-            if self.verbose:
-                # Quick read count (sample-based for speed)
-                self.log_step("Sampling reads for statistics...")
-                sample_size = 10000
-                read_count = 0
-                mapped_count = 0
-                
-                # Progress bar for read sampling
-                sample_progress = tqdm(desc="Sampling reads", 
-                                     total=sample_size, 
-                                     disable=not self.verbose, 
-                                     file=sys.stdout)
-                
-                for i, read in enumerate(bam.fetch()):
-                    if i >= sample_size:
-                        break
-                    read_count += 1
-                    if not read.is_unmapped:
-                        mapped_count += 1
-                    sample_progress.update(1)
-                
-                sample_progress.close()
-                
-                if read_count > 0:
-                    stats['mapped_percentage'] = (mapped_count / read_count) * 100
-                    self.log_step(f"Sample stats: {mapped_count}/{read_count} reads mapped "
-                                f"({stats['mapped_percentage']:.1f}%)")
-        
-        return stats
-    
-    def _process_chromosomes(self, bam_file, reference_file, target_chromosome=None):
-        """Process chromosomes with detailed progress tracking"""
-        self.current_step += 1
-        self.log_step("Starting chromosome-by-chromosome analysis...")
-        
+        # Process chromosomes
         all_candidates = []
         
         with pysam.AlignmentFile(bam_file, 'rb') as bam:
-            chromosomes = [target_chromosome] if target_chromosome else bam.references
+            chromosomes = [chromosome] if chromosome else bam.references
             
-            # Create chromosome progress bar - always show when verbose is true
-            chr_progress = tqdm(chromosomes, 
-                              desc="Processing chromosomes", 
-                              disable=not self.verbose, 
-                              file=sys.stdout,
-                              position=0,
-                              leave=True)
-            
-            for chr_name in chr_progress:
-                chr_progress.set_description(f"Processing {chr_name}")
+            for chr_name in chromosomes:
+                if self.verbose:
+                    print(f"Processing chromosome {chr_name}...")
                 
-                try:
-                    # Get chromosome length
-                    chr_length = bam.get_reference_length(chr_name)
-                    self.log_step(f"Analyzing chromosome {chr_name} (length: {chr_length:,} bp)")
-                    
-                    # Phase 1: Coverage analysis
-                    coverage_candidates = self._analyze_coverage(bam, chr_name, chr_length)
-                    
-                    # Phase 2: Junction detection
-                    junction_candidates = self._detect_junctions(bam, chr_name)
-                    
-                    # Phase 3: Split-read analysis
-                    split_candidates = self._analyze_split_reads(bam, chr_name)
-                    
-                    # Phase 4: Integrate results for this chromosome
-                    chr_candidates = self._integrate_chromosome_results(
-                        chr_name, coverage_candidates, junction_candidates, split_candidates
-                    )
-                    
-                    all_candidates.extend(chr_candidates)
-                    
-                    self.log_step(f"Chromosome {chr_name} complete: {len(chr_candidates)} candidates found")
-                    
-                except Exception as e:
-                    self.log_step(f"Error processing chromosome {chr_name}: {str(e)}", "ERROR")
-                    continue
-            
-            chr_progress.close()
-        
-        return all_candidates
-    
-    def _analyze_coverage(self, bam, chromosome, chr_length):
-        """Analyze coverage patterns using the proper CoverageAnalyzer"""
-        self.current_step += 1
-        self.log_step(f"  → Phase 1: Coverage analysis for {chromosome}")
+                # PROPER coverage analysis
+                coverage_candidates = self.coverage_analyzer.analyze_coverage(
+                    bam, chr_name, self.verbose
+                )
                 
-        # Create coverage analyzer with your parameters
-        coverage_analyzer = CoverageAnalyzer(
-            window_sizes=[1000],  # or use multiple: [500, 1000, 2000]
-            min_fold_enrichment=self.min_fold_enrichment,
-            min_coverage=self.min_coverage,
-            uniformity_threshold=0.4
-        )
-        
-        # Use the proper coverage analysis
-        candidates = coverage_analyzer._analyze_chromosome_coverage(
-            bam, chromosome, window_size=1000
-        )
-        
-        # Convert CircularCandidate objects to the expected dictionary format
-        dict_candidates = []
-        for cand in candidates:
-            # Only include candidates that meet your criteria
-            if (cand.confidence_score >= 0.3 and  # Add confidence threshold
-                cand.fold_enrichment >= self.min_fold_enrichment and
-                cand.mean_coverage >= self.min_coverage):
+                # Filter by length and confidence
+                filtered_candidates = []
+                for candidate in coverage_candidates:
+                    if (self.min_length <= candidate.length <= self.max_length and
+                        candidate.confidence_score >= self.min_confidence):
+                        filtered_candidates.append(candidate)
                 
-                dict_candidates.append({
-                    'chr': cand.chromosome,
-                    'start': cand.start,
-                    'end': cand.end,
-                    'coverage': cand.mean_coverage,
-                    'fold_enrichment': cand.fold_enrichment,
-                    'confidence_score': cand.confidence_score,
-                    'method': 'coverage'
-                })
+                all_candidates.extend(filtered_candidates)
+                
+                if self.verbose:
+                    print(f"  → {len(coverage_candidates)} raw candidates")
+                    print(f"  → {len(filtered_candidates)} high-confidence candidates")
         
-        self.log_step(f"  → Coverage analysis complete: {len(dict_candidates)} high-confidence regions found")
-        return dict_candidates
-    
-    def _detect_junctions(self, bam, chromosome):
-        """Detect junction signatures with progress tracking"""
-        self.current_step += 1
-        self.log_step(f"  → Phase 2: Junction detection for {chromosome}")
+        # Sort by confidence score
+        final_candidates = sorted(all_candidates, 
+                                key=lambda x: x.confidence_score, 
+                                reverse=True)
         
-        candidates = []
-        junction_count = 0
-        
-        # Get total reads for this chromosome for progress tracking
-        total_reads = bam.count(chromosome)
-        
-        # Progress tracking for junction detection
-        junction_progress = tqdm(bam.fetch(chromosome), 
-                               desc=f"Junction detection ({chromosome})", 
-                               total=total_reads,
-                               disable=not self.verbose,
-                               file=sys.stdout,
-                               position=1,
-                               leave=False)
-        
-        try:
-            for read in junction_progress:
-                # Junction detection logic
-                if self._is_junction_read(read):
-                    junction_count += 1
-                    candidates.append({
-                        'chr': chromosome,
-                        'start': read.reference_start,
-                        'end': read.reference_end,
-                        'method': 'junction',
-                        'read_name': read.query_name
-                    })
-                    
-                    # Update progress description with current count
-                    if junction_count % 100 == 0:
-                        junction_progress.set_description(f"Junction detection ({chromosome}) - Found: {junction_count}")
-                    
-        except Exception as e:
-            self.log_step(f"Error in junction detection: {str(e)}", "ERROR")
-        finally:
-            junction_progress.close()
-        
-        self.log_step(f"  → Junction detection complete: {len(candidates)} junction signatures found")
-        return candidates
-    
-    def _analyze_split_reads(self, bam, chromosome):
-        """Analyze split reads with progress tracking"""
-        self.current_step += 1
-        self.log_step(f"  → Phase 3: Split-read analysis for {chromosome}")
-        
-        candidates = []
-        split_count = 0
-        
-        # Get total reads for progress tracking
-        total_reads = bam.count(chromosome)
-        
-        # Progress bar for split-read analysis
-        split_progress = tqdm(bam.fetch(chromosome), 
-                            desc=f"Split-read analysis ({chromosome})", 
-                            total=total_reads,
-                            disable=not self.verbose,
-                            file=sys.stdout,
-                            position=1,
-                            leave=False)
-        
-        try:
-            for read in split_progress:
-                if self._is_split_read(read):
-                    split_count += 1
-                    candidates.append({
-                        'chr': chromosome,
-                        'start': read.reference_start,
-                        'end': read.reference_end,
-                        'method': 'split_read',
-                        'read_name': read.query_name
-                    })
-                    
-                    # Update progress description with current count
-                    if split_count % 100 == 0:
-                        split_progress.set_description(f"Split-read analysis ({chromosome}) - Found: {split_count}")
-                    
-        except Exception as e:
-            self.log_step(f"Error in split-read analysis: {str(e)}", "ERROR")
-        finally:
-            split_progress.close()
-        
-        self.log_step(f"  → Split-read analysis complete: {len(candidates)} split-read signatures found")
-        return candidates
-    
-    def _integrate_chromosome_results(self, chromosome, coverage_cands, junction_cands, split_cands):
-        """Integrate results from all three methods"""
-        self.current_step += 1
-        self.log_step(f"  → Phase 4: Integrating results for {chromosome}")
-        
-        # Simple integration logic (you'd make this more sophisticated)
-        all_candidates = coverage_cands + junction_cands + split_cands
-        
-        # Filter by length requirements with progress bar
-        filtered_candidates = []
-        
-        if self.verbose and len(all_candidates) > 1000:
-            # Show progress bar for filtering if there are many candidates
-            filter_progress = tqdm(all_candidates, 
-                                 desc=f"Filtering candidates ({chromosome})", 
-                                 disable=not self.verbose,
-                                 file=sys.stdout,
-                                 position=1,
-                                 leave=False)
-        else:
-            filter_progress = all_candidates
-        
-        for cand in filter_progress:
-            length = cand['end'] - cand['start']
-            if self.min_length <= length <= self.max_length:
-                cand['length'] = length
-                filtered_candidates.append(cand)
-        
-        if hasattr(filter_progress, 'close'):
-            filter_progress.close()
-        
-        self.log_step(f"  → Integration complete: {len(filtered_candidates)} candidates after filtering")
-        return filtered_candidates
-    
-    def _finalize_results(self, candidates, output_file):
-        """Finalize results and write output"""
-        self.current_step += 1
-        self.log_step("Finalizing results...")
-        
-        # Sort candidates by confidence/evidence with progress bar
-        if self.verbose and len(candidates) > 1000:
-            self.log_step("Sorting candidates by length...")
-            # For very large datasets, we might want to show sorting progress
-            
-        sorted_candidates = sorted(candidates, key=lambda x: x.get('length', 0), reverse=True)
-        
+        # Write output
         if output_file:
-            self._write_output(sorted_candidates, output_file)
+            self._write_output(final_candidates, output_file)
         
-        self.log_step(f"Results finalized: {len(sorted_candidates)} total candidates")
-        return sorted_candidates
+        # Print summary
+        self._print_summary(final_candidates, start_time)
+        
+        return final_candidates
+    
+    def _validate_inputs(self, bam_file, reference_file):
+        """Validate input files"""
+        try:
+            with pysam.AlignmentFile(bam_file, 'rb') as bam:
+                if not bam.has_index():
+                    self.logger.warning("BAM file is not indexed - performance will be slow")
+        except Exception as e:
+            raise ValueError(f"Invalid BAM file: {str(e)}")
+        
+        try:
+            with pysam.FastaFile(reference_file) as ref:
+                pass
+        except Exception as e:
+            raise ValueError(f"Invalid reference file: {str(e)}")
     
     def _write_output(self, candidates, output_file):
-        """Write results to BED file"""
-        self.log_step(f"Writing results to {output_file}")
-        
-        # Progress bar for writing output if many candidates
-        if self.verbose and len(candidates) > 1000:
-            write_progress = tqdm(candidates, 
-                                desc="Writing output", 
-                                disable=not self.verbose,
-                                file=sys.stdout)
-        else:
-            write_progress = candidates
+        """Write results with confidence scores"""
+        if self.verbose:
+            print(f"Writing {len(candidates)} candidates to {output_file}")
         
         with open(output_file, 'w') as f:
-            f.write("# CircDNA Detection Results\n")
-            f.write("# chr\tstart\tend\tname\tscore\tstrand\tmethod\tlength\n")
+            f.write("# FIXED CircDNA Detection Results\n")
+            f.write("# chr\tstart\tend\tname\tconfidence\tfold_enrichment\tcoverage\tlength\n")
             
-            for i, cand in enumerate(write_progress):
-                f.write(f"{cand['chr']}\t{cand['start']}\t{cand['end']}\t"
-                       f"circDNA_{i+1}\t{cand.get('coverage', 0):.1f}\t.\t"
-                       f"{cand['method']}\t{cand.get('length', 0)}\n")
-        
-        if hasattr(write_progress, 'close'):
-            write_progress.close()
+            for i, candidate in enumerate(candidates):
+                f.write(f"{candidate.chromosome}\t{candidate.start}\t{candidate.end}\t"
+                       f"circDNA_{i+1}\t{candidate.confidence_score:.3f}\t"
+                       f"{candidate.fold_enrichment:.2f}\t{candidate.mean_coverage:.1f}\t"
+                       f"{candidate.length}\n")
     
-    def _print_summary(self, results, start_time):
+    def _print_summary(self, candidates, start_time):
         """Print comprehensive summary"""
         elapsed_time = time.time() - start_time
         
         print("\n" + "="*60)
-        print("CIRCULAR DNA DETECTION SUMMARY")
+        print("FIXED CircDNA DETECTION SUMMARY")
         print("="*60)
-        print(f"Total candidates found: {len(results)}")
+        print(f"Total high-confidence candidates: {len(candidates)}")
         print(f"Analysis completed in: {elapsed_time:.2f} seconds")
         
-        if results:
-            # Method breakdown
-            method_counts = {}
-            for result in results:
-                method = result['method']
-                method_counts[method] = method_counts.get(method, 0) + 1
+        if candidates:
+            # Confidence distribution
+            confidences = [c.confidence_score for c in candidates]
+            fold_enrichments = [c.fold_enrichment for c in candidates if c.fold_enrichment]
             
-            print("\nCandidates by detection method:")
-            for method, count in method_counts.items():
-                print(f"  {method}: {count}")
+            print(f"\nConfidence score distribution:")
+            print(f"  Mean: {np.mean(confidences):.3f}")
+            print(f"  Median: {np.median(confidences):.3f}")
+            print(f"  Min: {min(confidences):.3f}")
+            print(f"  Max: {max(confidences):.3f}")
             
-            # Size distribution
-            lengths = [r.get('length', 0) for r in results]
-            if lengths:
-                print(f"\nSize distribution:")
-                print(f"  Min length: {min(lengths):,} bp")
-                print(f"  Max length: {max(lengths):,} bp")
-                print(f"  Mean length: {np.mean(lengths):,.0f} bp")
+            if fold_enrichments:
+                print(f"\nFold enrichment distribution:")
+                print(f"  Mean: {np.mean(fold_enrichments):.2f}")
+                print(f"  Median: {np.median(fold_enrichments):.2f}")
+                print(f"  Min: {min(fold_enrichments):.2f}")
+                print(f"  Max: {max(fold_enrichments):.2f}")
+            
+            # Top candidates
+            print(f"\nTop 10 candidates by confidence:")
+            for i, candidate in enumerate(candidates[:10]):
+                print(f"  {i+1}. {candidate.chromosome}:{candidate.start}-{candidate.end}")
+                print(f"     Confidence: {candidate.confidence_score:.3f}")
+                print(f"     Fold enrichment: {candidate.fold_enrichment:.2f}")
+                print(f"     Coverage: {candidate.mean_coverage:.1f}")
+                print(f"     Length: {candidate.length:,} bp")
         
         print("="*60)
-    
-    def _is_junction_read(self, read):
-        """Check if read shows junction signature"""
-        # Simplified junction detection logic
-        return (not read.is_unmapped and 
-                read.mapping_quality >= 20 and
-                read.cigarstring and 'S' in read.cigarstring)
-    
-    def _is_split_read(self, read):
-        """Check if read is split alignment"""
-        # Simplified split-read detection
-        return (read.has_tag('SA') or  # Supplementary alignment
-                (read.cigarstring and read.cigarstring.count('S') >= 2))
-
 
 def main():
-    """Enhanced main function with argument parsing"""
+    """Main function with proper argument parsing"""
     import argparse
     
-    parser = argparse.ArgumentParser(description='CircDNA Detection with Enhanced Progress Tracking')
+    parser = argparse.ArgumentParser(description='FIXED CircDNA Detection Pipeline')
     parser.add_argument('bam_file', help='Input BAM file')
     parser.add_argument('reference_file', help='Reference FASTA file')
-    parser.add_argument('-o', '--output', help='Output BED file', default='circular_dna_verbose.bed')
+    parser.add_argument('-o', '--output', help='Output file', default='fixed_circular_dna.bed')
     parser.add_argument('-c', '--chromosome', help='Analyze specific chromosome only')
-    parser.add_argument('-q', '--quiet', action='store_true', help='Disable verbose output (quiet mode)')  # Changed to quiet mode
-    parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'], 
-                       default='INFO', help='Set logging level')
-    parser.add_argument('--min-fold-enrichment', type=float, default=1.5)
-    parser.add_argument('--min-coverage', type=int, default=5)
-    parser.add_argument('--min-length', type=int, default=200)
-    parser.add_argument('--max-length', type=int, default=100000)
+    parser.add_argument('--min-fold-enrichment', type=float, default=1.5, 
+                       help='Minimum fold enrichment (default: 1.5)')
+    parser.add_argument('--min-coverage', type=int, default=5,
+                       help='Minimum coverage (default: 5)')
+    parser.add_argument('--min-length', type=int, default=200,
+                       help='Minimum length (default: 200)')
+    parser.add_argument('--max-length', type=int, default=100000,
+                       help='Maximum length (default: 100000)')
+    parser.add_argument('--min-confidence', type=float, default=0.3,
+                       help='Minimum confidence score (default: 0.3)')
+    parser.add_argument('--quiet', action='store_true', 
+                       help='Disable verbose output')
 
     args = parser.parse_args()
     
-    # Create detector with enhanced options - verbose is now default unless quiet is specified
-    detector = CircularDNADetector(
+    # Create FIXED detector
+    detector = FixedCircularDNADetector(
         min_fold_enrichment=args.min_fold_enrichment,
         min_coverage=args.min_coverage,
         min_length=args.min_length,
         max_length=args.max_length,
-        verbose=not args.quiet,  # Verbose is default, disabled only with --quiet
-        log_level=args.log_level
+        min_confidence=args.min_confidence,
+        verbose=not args.quiet
     )
     
     # Run detection
@@ -507,8 +606,8 @@ def main():
         args.chromosome
     )
     
-    print(f"\nAnalysis complete! Results written to {args.output}")
-
+    print(f"\nFixed analysis complete! Results written to {args.output}")
+    print(f"Found {len(results)} high-confidence circular DNA candidates")
 
 if __name__ == "__main__":
     main()
