@@ -34,7 +34,7 @@ jobs:
     
     - name: Test CLI works
       run: |
-        circDNA-detect --help
+        circontrack --help
     
     - name: Test Python import
       run: |
