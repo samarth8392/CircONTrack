@@ -1,28 +1,28 @@
 #!/usr/bin/env python3
 """
-ONT-Optimized Circular DNA Detection Package
-Combines coverage patterns, junction detection, and split-read analysis
+CircONTrack: ONT-optimized Circular DNA Detection Pipeline
 """
 
-__version__ = "1.0.0"
+__version__ = "0.1.0"
 __author__ = "Samarth Mathur, PhD"
 __email__ = "samarth8392@gmail.com"
 
-
-from .circular_dna_detector import FixedCircularDNADetector
+# Import main components
+from .circular_dna_detector import CircularDNADetector
 from .coverage_analyzer import CoverageAnalyzer
 from .junction_detector import JunctionDetector
 from .split_read_analyzer import SplitReadAnalyzer
-from .confidence_scorer import ConfidenceScorer
-from .utils import CircularCandidate, merge_overlapping_candidates, calculate_gc_content
+from .confidence_scorer import ConfidenceScorer, MultiMethodIntegrator
+from .utils import CircularCandidate, filter_candidates_by_confidence, calculate_gc_content
 
 __all__ = [
-    'FixedCircularDNADetector',
-    'CoverageAnalyzer', 
+    'CircularDNADetector',
+    'CoverageAnalyzer',
     'JunctionDetector',
     'SplitReadAnalyzer',
     'ConfidenceScorer',
+    'MultiMethodIntegrator',
     'CircularCandidate',
-    'merge_overlapping_candidates',
-    'calculate_gc_content'
+    'filter_candidates_by_confidence',
+    'calculate_gc_content',
 ]
