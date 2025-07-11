@@ -9,6 +9,9 @@ import logging
 from tqdm import tqdm
 import pysam
 import numpy as np
+from .utils import CircularCandidate
+from .confidence_scorer import ConfidenceScorer
+from .coverage_analyzer import CoverageAnalyzer
 
 class CircularDNADetector:
     """Enhanced detector with comprehensive progress tracking and verbose output"""
@@ -218,50 +221,40 @@ class CircularDNADetector:
         return all_candidates
     
     def _analyze_coverage(self, bam, chromosome, chr_length):
-        """Analyze coverage patterns with progress tracking"""
+        """Use the proper CoverageAnalyzer instead of broken built-in method"""
         self.current_step += 1
         self.log_step(f"  → Phase 1: Coverage analysis for {chromosome}")
         
-        candidates = []
-        window_size = 1000  # 1kb windows
-        num_windows = chr_length // window_size + 1
+        # Initialize the proper coverage analyzer with your parameters
+        if not hasattr(self, 'coverage_analyzer'):
+            self.coverage_analyzer = CoverageAnalyzer(
+                window_sizes=[1000, 5000],  # Multi-scale analysis
+                min_fold_enrichment=self.min_fold_enrichment,
+                min_coverage=self.min_coverage,
+                uniformity_threshold=0.4
+            )
         
-        # Progress bar for coverage analysis - always show when verbose
-        coverage_progress = tqdm(range(0, chr_length, window_size), 
-                               desc=f"Coverage analysis ({chromosome})", 
-                               disable=not self.verbose,
-                               file=sys.stdout,
-                               position=1,
-                               leave=False)
+        # Use the proper analyzer
+        candidates = self.coverage_analyzer._analyze_chromosome_coverage(
+            bam, chromosome, 5000  # Use 5kb windows
+        )
         
-        for start in coverage_progress:
-            end = min(start + window_size, chr_length)
-            
-            try:
-                # Calculate coverage for this window
-                coverage = bam.count_coverage(chromosome, start, end)
-                total_coverage = sum(sum(base_cov) for base_cov in coverage)
-                avg_coverage = total_coverage / (end - start) if end > start else 0
-                
-                # Check if this window meets criteria
-                if avg_coverage >= self.min_coverage:
-                    # Additional fold-enrichment check would go here
-                    candidates.append({
-                        'chr': chromosome,
-                        'start': start,
-                        'end': end,
-                        'coverage': avg_coverage,
-                        'method': 'coverage'
-                    })
-                    
-            except Exception as e:
-                if self.verbose:
-                    self.log_step(f"    Error in coverage window {start}-{end}: {str(e)}", "DEBUG")
-                continue
+        # Convert CircularCandidate objects to dict format for compatibility
+        dict_candidates = []
+        for cand in candidates:
+            dict_candidates.append({
+                'chr': cand.chromosome,
+                'start': cand.start,
+                'end': cand.end,
+                'length': cand.length,
+                'coverage': cand.mean_coverage,
+                'fold_enrichment': cand.fold_enrichment,
+                'coverage_uniformity': cand.coverage_uniformity,
+                'method': 'coverage'
+            })
         
-        coverage_progress.close()
-        self.log_step(f"  → Coverage analysis complete: {len(candidates)} regions with elevated coverage")
-        return candidates
+        self.log_step(f"  → Coverage analysis complete: {len(dict_candidates)} regions found")
+        return dict_candidates
     
     def _detect_junctions(self, bam, chromosome):
         """Detect junction signatures with progress tracking"""
