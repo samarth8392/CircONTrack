@@ -13,8 +13,8 @@ from .confidence_scorer import ConfidenceScorer
 
 class JunctionDetector:
     def __init__(self, min_support=3, max_junction_distance=1000, 
-                 min_clip_length=50, min_alignment_length=100,
-                 min_mapping_quality=20):
+             min_clip_length=50, min_alignment_length=100,
+             min_mapping_quality=20, verbose=False):
         """
         Initialize junction detector for ONT data
         
@@ -36,6 +36,7 @@ class JunctionDetector:
         self.min_clip_length = min_clip_length
         self.min_alignment_length = min_alignment_length
         self.min_mapping_quality = min_mapping_quality
+        self.verbose = verbose
         self.confidence_scorer = ConfidenceScorer()
     
     def detect_junctions(self, bam_file, chromosome=None):
@@ -43,6 +44,8 @@ class JunctionDetector:
         print("  Detecting junctions from long reads...")
         
         junction_candidates = []
+        if self.verbose:
+            print("  Detecting junctions from long reads...")
         
         with pysam.AlignmentFile(bam_file, "rb") as bam:
             chromosomes = [chromosome] if chromosome else bam.references
