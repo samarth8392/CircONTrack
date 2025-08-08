@@ -29,3 +29,27 @@ document.addEventListener('DOMContentLoaded', function() {
         block.parentNode.appendChild(button);
     });
 });
+
+// MathJax configuration
+window.MathJax = {
+  tex: {
+    inlineMath: [["\\(", "\\)"]],
+    displayMath: [["\\[", "\\]"]],
+    processEscapes: true,
+    processEnvironments: true
+  },
+  options: {
+    ignoreHtmlClass: ".*|",
+    processHtmlClass: "arithmatex"
+  }
+};
+
+// Initialize Mermaid
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof mermaid !== 'undefined') {
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'default'
+    });
+  }
+});
