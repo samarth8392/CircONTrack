@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `circDNA_detection` is a Python tool specifically designed for detecting circular DNA elements in Oxford Nanopore Technologies (ONT) long-read sequencing data. The package employs a multi-modal approach that combines three complementary detection methods to achieve high sensitivity and specificity.
+The `circontrack` is a Python tool specifically designed for detecting circular DNA elements in Oxford Nanopore Technologies (ONT) long-read sequencing data. The package employs a multi-modal approach that combines three complementary detection methods to achieve high sensitivity and specificity.
 
 ## Package Architecture
 
@@ -26,6 +26,8 @@ The package implements a comprehensive detection pipeline that consists of four 
 - Identifies regions with coverage significantly higher than background
 - Uses configurable fold-enrichment thresholds (default: 1.5x)
 - Filters based on minimum coverage depth (default: 5x)
+
+**Uses median and MAD (Median Absolute Deviation) instead of mean/standard deviation for robustness against outliers**
 
 **Implementation Logic Assessment**: 
 

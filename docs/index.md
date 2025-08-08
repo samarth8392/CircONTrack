@@ -28,26 +28,61 @@ The pipeline integrates four complementary detection approaches:
 ### Installation
 
 ```bash
-pip install git+https://github.com/samarth8392/circDNA_detection.git
+pip install git+https://github.com/samarth8392/CircONTrack.git
 ```
 
 ### Basic Usage
 
 ```bash
-circDNA-detect input.bam reference.fasta -o output.bed
-```
+circontrack input.bam reference.fasta -o output.bed
 
-### Python API
+circontrack -h
 
-```python
-from circDNA_detection import CircularDNADetector
+    
+   _____ _           ____  _   _ _______             _    
+  / ____(_)         / __ \| \ | |__   __|           | |   
+ | |     _ _ __ ___| |  | |  \| |  | |_ __ __ _  ___| | __
+ | |    | | '__/ __| |  | | . ` |  | | '__/ _` |/ __| |/ /
+ | |____| | | | (__| |__| | |\  |  | | | | (_| | (__|   < 
+  \_____|_|_|  \___|\____/|_| \_|  |_|_|  \__,_|\___|_|\_\ 
 
-detector = CircularDNADetector(
-    min_fold_enrichment=1.5,
-    min_coverage=5,
-    min_length=200
-)
-candidates = detector.detect_circular_dna("input.bam", "reference.fasta")
+    
+
+     Circular DNA Tracking and Detection via ONT-based Multi-modal Signal Integration 
+
+      Version:  0.1.0   
+    
+usage: circontrack [-h] [-o OUTPUT] [-c CHROMOSOME] [-q] [--log-level {DEBUG,INFO,WARNING,ERROR}] [--min-fold-enrichment MIN_FOLD_ENRICHMENT] [--min-coverage MIN_COVERAGE] [--min-length MIN_LENGTH]
+                   [--max-length MAX_LENGTH] [--min-confidence MIN_CONFIDENCE]
+                   bam_file reference_file
+
+Detect circular DNA from ONT sequencing data using multi-modal analysis
+
+positional arguments:
+  bam_file              Input BAM file
+  reference_file        Reference FASTA file
+
+options:
+  -h, --help            show this help message and exit
+  -o OUTPUT, --output OUTPUT
+                        Output BED file
+  -c CHROMOSOME, --chromosome CHROMOSOME
+                        Analyze specific chromosome only
+  -q, --quiet           Disable verbose output (quiet mode)
+  --log-level {DEBUG,INFO,WARNING,ERROR}
+                        Set logging level
+  --min-fold-enrichment MIN_FOLD_ENRICHMENT
+                        Minimum fold enrichment for coverage-based detection
+  --min-coverage MIN_COVERAGE
+                        Minimum coverage threshold
+  --min-length MIN_LENGTH
+                        Minimum circular DNA length
+  --max-length MAX_LENGTH
+                        Maximum circular DNA length
+  --min-confidence MIN_CONFIDENCE
+                        Minimum confidence score threshold
+
+
 ```
 
 ## Requirements

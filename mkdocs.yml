@@ -51,6 +51,7 @@ nav:
     - Pipeline: pipeline_flowchart.md
   - Algorithm:
     - Workflow: workflow.md
+    - Classification: characterization.md
     
 
 # Extensions
