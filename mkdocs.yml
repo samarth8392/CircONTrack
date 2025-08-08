@@ -1,9 +1,9 @@
-# MkDocs configuration for circDNA_detection documentation
+# MkDocs configuration for CircONTrack documentation
 site_name: CircONTrack
 site_description:  Circular DNA Tracking and Detection via ONT-based Multi-modal Signal Integration
 site_author: Samarth Mathur
 site_url: https://samarth8392.github.io/CircONTrack/
-repo_name: circDNA_detection
+repo_name: CircONTrack
 repo_url: https://github.com/samarth8392/CircONTrack
 edit_uri: edit/main/docs/
 
@@ -15,7 +15,7 @@ theme:
     - python
     - bash
     - yaml
-  navigation_depth: 3
+  navigation_depth: 2
   titles_only: false
 
 # Navigation structure
@@ -26,9 +26,10 @@ nav:
   - User Guide:
     - Overview: pipeline_overview.md
     - Pipeline: pipeline_flowchart.md
+    - Characterization: chimeric_characterization.md
   - Algorithm:
     - Workflow: workflow.md
-    - Classification: characterization.md
+    - Characterization: characterization.md
 
 # Extensions
 markdown_extensions:

@@ -87,7 +87,7 @@ flowchart TD
 **Algorithm**:
 
 1. **Read Collection Phase**
-   - Fetch all reads from region in combined BAM where $\text{mapq} \geq \text{min\_mapq}$
+   - Fetch all reads from region in combined BAM where $\text{mapq} \geq \text{min_mapq}$
    - Store unique read IDs in set $R$
 
 2. **Read Classification**

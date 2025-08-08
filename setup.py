@@ -32,7 +32,8 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "circontrack=circDNA_detection.circular_dna_detector:main",
+            'circontrack=circDNA_detection.circular_dna_detector:main',
+            'circontrack-classify=circDNA_detection.classify:main',
         ],
     },
 )
