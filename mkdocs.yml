@@ -26,10 +26,10 @@ nav:
   - User Guide:
     - Overview: pipeline_overview.md
     - Pipeline: pipeline_flowchart.md
-    - Characterization: chimeric_characterization.md
+    - Classify: classify.md
   - Algorithm:
     - Workflow: workflow.md
-    - Characterization: characterization.md
+    - Classify: classify_workflow.md
 
 # Extensions
 markdown_extensions:
