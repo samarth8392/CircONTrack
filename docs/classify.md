@@ -275,41 +275,5 @@ p_{\text{host}} & \text{if host\_eccDNA} \\
 \max(p_{\text{host}}, p_{\text{viral}}, p_{\text{chimeric}}) & \text{if mixed}
 \end{cases}$$
 
-## Output Formats
 
-### Classified BED Format
-
-```
-#chrom  start     end       name        score  strand  type              confidence  total  host  viral  chimeric  integration  viral_species
-chr19   61174743  61288479  circDNA_1   950    .       integration_site  0.950       120    45    23     40        12          CMV,EBV
-chr2    10000     15000     circDNA_2   850    .       host_eccDNA       0.850       89     76    0      13        0           none
-chr5    20000     25000     circDNA_3   920    .       viral_episome     0.920       95     5     87     3         0           AAV
-```
-
-### Summary Report Structure
-
-```
-CircONTrack Classification Summary
-============================================================
-
-Total regions analyzed: 156
-
-Classification breakdown:
-  host_eccDNA         :   89 (57.1%)
-  viral_episome       :   23 (14.7%)
-  viral_dominant      :   12 ( 7.7%)
-  integration_site    :   18 (11.5%)
-  chimeric           :    9 ( 5.8%)
-  mixed              :    5 ( 3.2%)
-
-Viral species detected:
-  EBV: 28 regions
-  CMV: 15 regions
-  AAV: 10 regions
-
-18 potential integration sites:
-  circDNA_1: chr19:61174743-61288479 (CMV,EBV) [12 junction reads]
-  circDNA_8: chr3:45000000-45010000 (AAV) [8 junction reads]
-  ...
-```
 

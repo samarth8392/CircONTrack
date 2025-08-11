@@ -7,27 +7,51 @@ The CircONTrack classification module (`circontrack-classify`) provides a stream
 3. Classifying regions based on read composition patterns
 4. Providing confidence scores for each classification
 
+## Output Formats
+
+### Classified BED Format
+
+```
+chr19  1000  5000  circDNA_1  850  .  integration_site  0.85  100  45  20  30  5  High Plains wheat mosaic virus|CMV  NC_029549,NC_029550
+```
+
+### Summary Report Structure
+
+```
+Viral species detected:
+  High Plains wheat mosaic virus: 12 regions
+  Cytomegalovirus: 8 regions
+  Human papillomavirus type 16: 3 regions
+
+Viral contigs (RefSeq accessions):
+  NC_029549: 12 regions (High Plains wheat mosaic virus)
+  NC_001699: 8 regions (Cytomegalovirus)
+  ...
+```
+
 ## Usage Examples
 
 ### Basic Classification
-```bash
-# Minimal command
-circontrack-classify circdna.bed combined_ref.fa combined.bam -o results
+Basic usage with RefSeq viruses:
 
-# Output files:
-# - results_classified.bed
-# - results_summary.txt
+```bash
+bashcircontrack-classify circdna.bed combined_ref.fa combined.bam -o results
 ```
 
-### With Custom Parameters
+
+### Custom viral patterns:
 ```bash
-# Custom viral prefix and quality threshold
+# If your viruses have different naming patterns
 circontrack-classify circdna.bed combined_ref.fa combined.bam \
-    --viral-prefix "virus_" \
-    --min-mapq 30 \
-    -o high_quality_results
+    --viral-patterns NC_ NR_ phage_ virus_ -o results
 ```
 
+### Without parsing species names:
+```bash
+# Just use contig IDs
+circontrack-classify circdna.bed combined_ref.fa combined.bam \
+    --no-parse-names -o results
+```
 
 ## Biological Interpretation Guide
 

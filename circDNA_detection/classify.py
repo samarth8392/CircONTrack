@@ -1,47 +1,149 @@
 #!/usr/bin/env python3
 """
-Simplified CircONTrack Classify Module
-Only requires combined reference BAM since viral genomes are separate contigs
+CircONTrack Classify Module - Updated for RefSeq viral sequences
+Handles real viral contig names (NC_*, NR_*) and extracts species from FASTA headers
 """
 
 import pysam
 import numpy as np
+import re
 from collections import defaultdict
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Set
 import argparse
 import sys
 import os
 
-class SimplifiedCircularDNAClassifier:
+class CircularDNAClassifier:
     """
-    Classify circular DNA using only combined reference BAM
-    Works because viral genomes are separate contigs, not integrated into host chromosomes
+    Classify circular DNA using combined reference BAM
+    Updated to handle RefSeq viral sequences (NC_*, NR_*, etc.)
     """
     
-    def __init__(self, combined_ref_path: str, viral_contig_prefix: str = "viral"):
+    def __init__(self, combined_ref_path: str, 
+                 viral_patterns: List[str] = None,
+                 parse_viral_names: bool = True):
         """
-        Initialize with just the combined reference
+        Initialize with combined reference
         
         Args:
             combined_ref_path: Combined host+viral reference FASTA
-            viral_contig_prefix: Prefix identifying viral contigs
+            viral_patterns: List of patterns to identify viral contigs 
+                           (default: ['NC_', 'NR_', 'NZ_', 'viral'])
+            parse_viral_names: Extract virus names from FASTA headers
         """
         self.combined_ref = pysam.FastaFile(combined_ref_path)
-        self.viral_prefix = viral_contig_prefix
         
-        # Identify viral vs host contigs
+        # Default patterns for viral contigs (RefSeq accessions)
+        if viral_patterns is None:
+            self.viral_patterns = ['NC_', 'NR_', 'NZ_', 'viral', 'virus']
+        else:
+            self.viral_patterns = viral_patterns
+        
+        # Build contig classification and name mapping
         self.viral_contigs = set()
         self.host_contigs = set()
+        self.viral_contig_to_species = {}  # Map contig ID to species name
         
-        for ref in self.combined_ref.references:
-            if ref.startswith(viral_contig_prefix):
-                self.viral_contigs.add(ref)
-            else:
-                self.host_contigs.add(ref)
+        self._classify_contigs(combined_ref_path, parse_viral_names)
         
         print(f"Reference contains {len(self.host_contigs)} host and {len(self.viral_contigs)} viral contigs")
-        if self.viral_contigs:
-            print(f"Viral contigs: {', '.join(sorted(self.viral_contigs))}")
+        
+        if self.viral_contigs and len(self.viral_contigs) <= 20:
+            print("\nViral contigs detected:")
+            for contig in sorted(self.viral_contigs)[:20]:
+                species = self.viral_contig_to_species.get(contig, 'Unknown')
+                print(f"  {contig}: {species}")
+            if len(self.viral_contigs) > 20:
+                print(f"  ... and {len(self.viral_contigs) - 20} more")
+    
+    def _classify_contigs(self, fasta_path: str, parse_names: bool):
+        """
+        Classify contigs as host or viral and extract species names
+        
+        Parses FASTA headers like:
+        >NC_029549 High Plains wheat mosaic virus isolate Nebraska segment RNA 2, complete sequence
+        >chr1
+        """
+        print("Parsing reference FASTA to identify viral contigs...")
+        
+        with open(fasta_path, 'r') as f:
+            current_contig = None
+            
+            for line in f:
+                if line.startswith('>'):
+                    # Parse header
+                    header = line[1:].strip()
+                    
+                    # Extract contig ID (first word)
+                    contig_id = header.split()[0]
+                    
+                    # Check if viral based on patterns
+                    is_viral = any(contig_id.startswith(pattern) for pattern in self.viral_patterns)
+                    
+                    if is_viral:
+                        self.viral_contigs.add(contig_id)
+                        
+                        if parse_names and ' ' in header:
+                            # Extract species name from header
+                            # Remove contig ID to get description
+                            description = header[len(contig_id):].strip()
+                            
+                            # Clean up the species name
+                            species_name = self._extract_species_name(description)
+                            self.viral_contig_to_species[contig_id] = species_name
+                        else:
+                            # Use contig ID as species name
+                            self.viral_contig_to_species[contig_id] = contig_id
+                    else:
+                        # Host contig (chr*, scaffold*, etc.)
+                        self.host_contigs.add(contig_id)
+    
+    def _extract_species_name(self, description: str) -> str:
+        """
+        Extract clean species name from FASTA description
+        
+        Examples:
+        "High Plains wheat mosaic virus isolate Nebraska segment RNA 2, complete sequence"
+        → "High Plains wheat mosaic virus"
+        
+        "Human papillomavirus type 16, complete genome"
+        → "Human papillomavirus type 16"
+        """
+        # Remove common suffixes
+        clean_name = description
+        
+        # Remove segment information
+        clean_name = re.sub(r'(segment|segment\s+\w+|segment\s+RNA\s+\d+)', '', clean_name, flags=re.IGNORECASE)
+        
+        # Remove sequence descriptors
+        clean_name = re.sub(r',?\s*(complete\s+sequence|complete\s+genome|partial\s+sequence|genome)', '', 
+                           clean_name, flags=re.IGNORECASE)
+        
+        # Remove isolate/strain info (optional - keep if you want strain-level detail)
+        clean_name = re.sub(r'(isolate|strain|clone)\s+[\w\-\.]+', '', clean_name, flags=re.IGNORECASE)
+        
+        # Clean up whitespace
+        clean_name = ' '.join(clean_name.split())
+        
+        # If name is too long, truncate intelligently
+        if len(clean_name) > 50:
+            # Try to keep just virus name
+            if 'virus' in clean_name.lower():
+                parts = clean_name.split('virus')
+                clean_name = parts[0] + 'virus'
+            else:
+                clean_name = clean_name[:50] + '...'
+        
+        return clean_name.strip() or description[:50]
+    
+    def _is_viral_contig(self, contig_name: str) -> bool:
+        """Check if a contig is viral based on name patterns or known viral contigs"""
+        # First check our pre-classified set
+        if contig_name in self.viral_contigs:
+            return True
+        
+        # Also check patterns in case of SA tags with contigs not in main reference
+        return any(contig_name.startswith(pattern) for pattern in self.viral_patterns)
     
     def classify_bed_file(self, bed_file: str, combined_bam_path: str, 
                           output_prefix: str, min_mapq: int = 20, 
@@ -108,7 +210,8 @@ class SimplifiedCircularDNAClassifier:
             'viral_only': 0,
             'chimeric': 0,
             'integration_junction': 0,
-            'viral_species': set(),
+            'viral_contigs': set(),  # Track which viral contigs are present
+            'viral_species': set(),   # Track virus species names
             'junction_positions': []
         }
         
@@ -127,24 +230,29 @@ class SimplifiedCircularDNAClassifier:
             stats['total_reads'] += 1
             
             # Classify this read
-            read_class, viral_refs = self._classify_read(read)
+            read_class, viral_contigs = self._classify_read(read)
             
             if read_class == 'host_only':
                 stats['host_only'] += 1
             elif read_class == 'viral_only':
                 stats['viral_only'] += 1
-                stats['viral_species'].update(viral_refs)
+                stats['viral_contigs'].update(viral_contigs)
             elif read_class == 'chimeric':
                 stats['chimeric'] += 1
-                stats['viral_species'].update(viral_refs)
+                stats['viral_contigs'].update(viral_contigs)
             elif read_class == 'integration':
                 stats['integration_junction'] += 1
                 stats['chimeric'] += 1  # Count as chimeric too
-                stats['viral_species'].update(viral_refs)
+                stats['viral_contigs'].update(viral_contigs)
                 
                 # Record junction position
                 if read.reference_start >= start and read.reference_start <= end:
                     stats['junction_positions'].append(read.reference_start)
+        
+        # Convert viral contigs to species names
+        for contig in stats['viral_contigs']:
+            species = self.viral_contig_to_species.get(contig, contig)
+            stats['viral_species'].add(species)
         
         # Determine region type
         region_type, confidence = self._determine_region_type(stats)
@@ -152,25 +260,28 @@ class SimplifiedCircularDNAClassifier:
         stats['type'] = region_type
         stats['confidence'] = confidence
         stats['viral_species'] = list(stats['viral_species'])
+        stats['viral_contigs'] = list(stats['viral_contigs'])
         
         if verbose and stats['viral_species']:
-            print(f"  Viral species detected: {', '.join(stats['viral_species'])}")
+            print(f"  Viral species detected: {', '.join(stats['viral_species'][:3])}")
+            if len(stats['viral_species']) > 3:
+                print(f"    ... and {len(stats['viral_species']) - 3} more")
         
         return stats
     
-    def _classify_read(self, read) -> Tuple[str, set]:
+    def _classify_read(self, read) -> Tuple[str, Set[str]]:
         """
         Classify a single read based on its alignments
         
         Returns:
             (classification, set_of_viral_contigs)
         """
-        viral_refs = set()
+        viral_contigs = set()
         
         # Check primary alignment
-        primary_is_viral = read.reference_name in self.viral_contigs
+        primary_is_viral = self._is_viral_contig(read.reference_name)
         if primary_is_viral:
-            viral_refs.add(read.reference_name)
+            viral_contigs.add(read.reference_name)
         
         # Check for supplementary alignments
         has_host_supp = False
@@ -183,37 +294,41 @@ class SimplifiedCircularDNAClassifier:
                     continue
                     
                 sa_fields = sa_entry.split(',')
+                if len(sa_fields) < 6:
+                    continue
+                    
                 sa_ref = sa_fields[0]
                 
-                if sa_ref in self.viral_contigs:
+                if self._is_viral_contig(sa_ref):
                     has_viral_supp = True
-                    viral_refs.add(sa_ref)
-                elif sa_ref in self.host_contigs:
+                    viral_contigs.add(sa_ref)
+                else:
                     has_host_supp = True
         
         # Check for large soft clips (potential integration signature)
         has_large_clips = False
         if read.cigartuples:
             # Check first and last operations
-            if read.cigartuples[0][0] == 4 and read.cigartuples[0][1] > 30:
-                has_large_clips = True
-            if read.cigartuples[-1][0] == 4 and read.cigartuples[-1][1] > 30:
-                has_large_clips = True
+            if len(read.cigartuples) > 0:
+                if read.cigartuples[0][0] == 4 and read.cigartuples[0][1] > 30:
+                    has_large_clips = True
+                if read.cigartuples[-1][0] == 4 and read.cigartuples[-1][1] > 30:
+                    has_large_clips = True
         
         # Classify based on alignment pattern
         if primary_is_viral:
             if has_host_supp:
-                return ('integration', viral_refs)
+                return ('integration', viral_contigs)
             else:
-                return ('viral_only', viral_refs)
+                return ('viral_only', viral_contigs)
         else:  # Primary is host
             if has_viral_supp:
                 if has_large_clips:
-                    return ('integration', viral_refs)
+                    return ('integration', viral_contigs)
                 else:
-                    return ('chimeric', viral_refs)
+                    return ('chimeric', viral_contigs)
             else:
-                return ('host_only', viral_refs)
+                return ('host_only', viral_contigs)
     
     def _determine_region_type(self, stats: Dict) -> Tuple[str, float]:
         """Determine region type from read statistics"""
@@ -261,23 +376,30 @@ class SimplifiedCircularDNAClassifier:
         with open(f"{output_prefix}_classified.bed", 'w') as f:
             f.write("#chrom\tstart\tend\tname\tscore\tstrand\ttype\tconfidence\t")
             f.write("total_reads\thost_only\tviral_only\tchimeric\tintegration_junction\t")
-            f.write("viral_species\n")
+            f.write("viral_species\tviral_contigs\n")
             
             for c in classifications:
                 score = int(c['confidence'] * 1000)
-                viral_str = ','.join(c['viral_species']) if c['viral_species'] else 'none'
+                
+                # Format viral species (clean names)
+                viral_species_str = '|'.join(c['viral_species'][:3]) if c['viral_species'] else 'none'
+                if len(c['viral_species']) > 3:
+                    viral_species_str += f'_and_{len(c["viral_species"])-3}_more'
+                
+                # Format viral contigs (accessions)
+                viral_contigs_str = ','.join(c['viral_contigs']) if c['viral_contigs'] else 'none'
                 
                 f.write(f"{c['chrom']}\t{c['start']}\t{c['end']}\t")
                 f.write(f"{c['name']}\t{score}\t.\t{c['type']}\t")
                 f.write(f"{c['confidence']:.3f}\t{c['total_reads']}\t")
                 f.write(f"{c['host_only']}\t{c['viral_only']}\t")
                 f.write(f"{c['chimeric']}\t{c['integration_junction']}\t")
-                f.write(f"{viral_str}\n")
+                f.write(f"{viral_species_str}\t{viral_contigs_str}\n")
         
-        # Write summary
+        # Write detailed summary
         with open(f"{output_prefix}_summary.txt", 'w') as f:
             f.write("CircONTrack Classification Summary\n")
-            f.write("=" * 60 + "\n\n")
+            f.write("=" * 80 + "\n\n")
             
             total = len(classifications)
             f.write(f"Total regions analyzed: {total}\n\n")
@@ -295,33 +417,49 @@ class SimplifiedCircularDNAClassifier:
                     pct = count / total * 100
                     f.write(f"  {region_type:20s}: {count:4d} ({pct:5.1f}%)\n")
             
-            # Viral species
-            all_species = set()
+            # Viral species summary
+            all_species = defaultdict(int)
+            all_contigs = defaultdict(int)
+            
             for c in classifications:
-                all_species.update(c.get('viral_species', []))
+                for species in c.get('viral_species', []):
+                    all_species[species] += 1
+                for contig in c.get('viral_contigs', []):
+                    all_contigs[contig] += 1
             
             if all_species:
-                f.write(f"\nViral species detected:\n")
-                for species in sorted(all_species):
-                    # Count regions with this species
-                    count = sum(1 for c in classifications if species in c.get('viral_species', []))
+                f.write(f"\n{len(all_species)} viral species detected:\n")
+                # Sort by frequency
+                for species, count in sorted(all_species.items(), key=lambda x: -x[1])[:20]:
                     f.write(f"  {species}: {count} regions\n")
+                if len(all_species) > 20:
+                    f.write(f"  ... and {len(all_species) - 20} more species\n")
+                
+                f.write(f"\nViral contigs (RefSeq accessions):\n")
+                for contig, count in sorted(all_contigs.items(), key=lambda x: -x[1])[:10]:
+                    species = self.viral_contig_to_species.get(contig, 'Unknown')
+                    f.write(f"  {contig}: {count} regions ({species})\n")
             
             # Integration sites
             integration_sites = [c for c in classifications if c['type'] == 'integration_site']
             if integration_sites:
                 f.write(f"\n{len(integration_sites)} potential integration sites:\n")
-                for site in integration_sites:
+                for site in integration_sites[:20]:
                     f.write(f"  {site['name']}: {site['chrom']}:{site['start']}-{site['end']}")
                     if site['viral_species']:
-                        f.write(f" ({', '.join(site['viral_species'])})")
+                        species_str = ', '.join(site['viral_species'][:2])
+                        if len(site['viral_species']) > 2:
+                            species_str += f" and {len(site['viral_species'])-2} more"
+                        f.write(f" ({species_str})")
                     f.write(f" [{site['integration_junction']} junction reads]\n")
+                if len(integration_sites) > 20:
+                    f.write(f"  ... and {len(integration_sites) - 20} more sites\n")
     
     def _print_summary(self, classifications: List[Dict]):
         """Print summary to console"""
-        print("\n" + "=" * 60)
+        print("\n" + "=" * 80)
         print("CLASSIFICATION SUMMARY")
-        print("=" * 60)
+        print("=" * 80)
         
         total = len(classifications)
         type_counts = defaultdict(int)
@@ -332,35 +470,53 @@ class SimplifiedCircularDNAClassifier:
             pct = count / total * 100
             print(f"{region_type:20s}: {count:3d} ({pct:5.1f}%)")
         
+        # Collect all viral species
+        all_species = set()
+        for c in classifications:
+            all_species.update(c.get('viral_species', []))
+        
+        if all_species:
+            print(f"\n🦠 {len(all_species)} different viral species detected")
+            # Show top 5
+            species_counts = defaultdict(int)
+            for c in classifications:
+                for species in c.get('viral_species', []):
+                    species_counts[species] += 1
+            
+            print("Top viral species:")
+            for species, count in sorted(species_counts.items(), key=lambda x: -x[1])[:5]:
+                print(f"  - {species}: {count} regions")
+        
         # Highlight key findings
         if type_counts.get('integration_site', 0) > 0:
             print(f"\n⚠️  {type_counts['integration_site']} potential viral integration site(s) detected!")
         
         if type_counts.get('viral_episome', 0) > 0:
-            print(f"🦠 {type_counts['viral_episome']} viral episome(s) detected")
+            print(f"🔬 {type_counts['viral_episome']} viral episome(s) detected")
         
-        print("=" * 60)
+        print("=" * 80)
 
 
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(
-        description='Classify CircONTrack circular DNA regions (simplified version)',
+        description='Classify CircONTrack circular DNA regions (RefSeq-aware version)',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-This simplified version only requires:
-  - Combined host+viral reference (with viral as separate contigs)
-  - BAM file aligned to the combined reference
-  
-It does NOT need separate host-only alignments.
+This version automatically detects RefSeq viral sequences (NC_*, NR_* accessions)
+and extracts virus species names from FASTA headers.
 
 Examples:
-  # Basic usage
+  # Basic usage with RefSeq viruses
   circontrack-classify circdna.bed combined_ref.fa combined.bam -o results
   
-  # With custom viral prefix
+  # Custom patterns for viral contigs
   circontrack-classify circdna.bed combined_ref.fa combined.bam \\
-    --viral-prefix "virus_" -o results
+    --viral-patterns NC_ NR_ viral_ phage_ -o results
+  
+  # Use contig names only (don't parse species from headers)
+  circontrack-classify circdna.bed combined_ref.fa combined.bam \\
+    --no-parse-names -o results
         """
     )
     
@@ -373,8 +529,11 @@ Examples:
     
     parser.add_argument('-o', '--output', default='classified',
                        help='Output prefix (default: classified)')
-    parser.add_argument('--viral-prefix', default='viral',
-                       help='Prefix for viral contigs (default: "viral")')
+    parser.add_argument('--viral-patterns', nargs='+',
+                       default=['NC_', 'NR_', 'NZ_', 'viral', 'virus'],
+                       help='Patterns to identify viral contigs (default: NC_ NR_ NZ_ viral virus)')
+    parser.add_argument('--no-parse-names', action='store_true',
+                       help='Do not parse virus names from FASTA headers')
     parser.add_argument('--min-mapq', type=int, default=20,
                        help='Minimum mapping quality (default: 20)')
     parser.add_argument('--quiet', action='store_true',
@@ -392,9 +551,10 @@ Examples:
     
     # Run classification
     print("Initializing classifier...")
-    classifier = SimplifiedCircularDNAClassifier(
+    classifier = CircularDNAClassifier(
         args.combined_ref,
-        args.viral_prefix
+        viral_patterns=args.viral_patterns,
+        parse_viral_names=not args.no_parse_names
     )
     
     print(f"Classifying regions from {args.bed_file}...")
