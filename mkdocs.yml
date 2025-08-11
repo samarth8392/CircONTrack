@@ -26,10 +26,10 @@ nav:
   - User Guide:
     - Overview: pipeline_overview.md
     - Pipeline: pipeline_flowchart.md
-    - Classify: classify.md
+    - Classify: classify_usage.md
   - Algorithm:
     - Workflow: workflow.md
-    - Classify: classify_workflow.md
+    - Classify: classify.md
 
 # Extensions
 markdown_extensions:
