@@ -64,29 +64,4 @@ circontrack-classify circdna.bed combined_ref.fa combined.bam \
 | `chimeric` | Complex host-viral rearrangement | Multiple transitions | Genome instability |
 | `mixed` | Unclear classification | No dominant type | Requires manual review |
 
-## Validation and Quality Control
-
-### Expected Patterns by Sample Type
-
-| Sample Type | Expected Distribution |
-|------------|----------------------|
-| Normal tissue | >95% host_eccDNA, <5% other |
-| Viral infection | Mix of host_eccDNA and viral_episome |
-| Cancer with viral integration | Presence of integration_site regions |
-| Cell line with viral vectors | High proportion of viral_episome |
-
-### Quality Metrics
-
-1. **Read depth**: Minimum 10 reads per region for confident classification
-2. **Junction support**: ≥2 junction reads for integration site confirmation  
-3. **Consistency**: Multiple reads showing same pattern increases confidence
-
-## Troubleshooting
-
-| Issue | Possible Cause | Solution |
-|-------|---------------|----------|
-| No viral detected | Wrong viral prefix | Check reference contig names |
-| All regions "mixed" | Low coverage | Increase sequencing depth |
-| False integration sites | Short read contamination | Increase min_mapq threshold |
-| Missing episomes | Circular reads not detected | Check aligner settings for supplementary alignments |
 

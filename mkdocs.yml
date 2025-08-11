@@ -5,7 +5,6 @@ site_author: Samarth Mathur
 site_url: https://samarth8392.github.io/CircONTrack/
 repo_name: CircONTrack
 repo_url: https://github.com/samarth8392/CircONTrack
-edit_uri: edit/main/docs/
 
 # Theme configuration
 theme:
