@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="CircONTrack",
-    version="0.2.0",
+    version="0.2.1",
     author="Samarth Mathur, PhD",
     author_email="samarth8392@gmail.com",
     description="Circular DNA Tracking and Detection via ONT-based Multi-modal Signal Integration",
