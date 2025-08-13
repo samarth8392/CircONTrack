@@ -17,7 +17,7 @@ from .utils import CircularCandidate
 class CoverageAnalyzer:
     """Coverage-based circular DNA detection using multi-scale analysis"""
     
-    def __init__(self, window_sizes=[500, 1000, 5000], min_fold_enrichment=1.5, 
+    def __init__(self, window_sizes=[1000], min_fold_enrichment=1.5, 
                  min_coverage=5, uniformity_threshold=0.4, verbose=True):
         self.window_sizes = window_sizes
         self.min_fold_enrichment = min_fold_enrichment
