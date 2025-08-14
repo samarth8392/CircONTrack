@@ -26,6 +26,7 @@ nav:
     - Overview: pipeline_overview.md
     - Pipeline: pipeline_flowchart.md
     - Classify: classify_usage.md
+    - Assemble: assemble.md
   - Algorithm:
     - Workflow: workflow.md
     - Classify: classify.md
