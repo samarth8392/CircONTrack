@@ -96,7 +96,3 @@ circontrack-peaks sample.bam -r reference.fa \
 | `--merge-distance` | 1000 | Merge peaks within this distance |
 | `--plot` | False | Generate coverage plots |
 
-## Coverage Peaks Presentation
-
-<iframe src="../docs/coverage_peak_slides.html" width="100%" height="600px" style="border:none;">
-</iframe>
