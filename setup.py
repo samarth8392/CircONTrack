@@ -20,32 +20,20 @@ setup(
     packages=find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Intended Audience :: Science/Research",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.10",
     install_requires=[
         "pysam>=0.19.0",
         "numpy>=1.19.0",
         "scipy>=1.6.0",
+        "tqdm>=4.60.0",
+        "rich>=10.0.0",
     ],
-    extras_require={
-        "full": [
-            "pandas>=1.0.0",  # For better stats output
-            "tqdm>=4.60.0",   # For progress bars
-        ],
-        "dev": [
-            "pytest>=6.0.0",
-            "black>=21.0",
-            "flake8>=3.9.0",
-        ],
-    },
     entry_points={
         "console_scripts": [
             "circontrack=circDNA_detection.circular_dna_detector:main",
