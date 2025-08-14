@@ -11,6 +11,8 @@ from scipy.signal import find_peaks
 from statsmodels.stats.multitest import multipletests
 import argparse
 import sys
+import matplotlib
+matplotlib.use('Agg') 
 from pathlib import Path
 from collections import defaultdict
 import warnings
