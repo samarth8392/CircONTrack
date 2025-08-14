@@ -2,6 +2,7 @@
 """
 CircONTrack Coverage Peaks - Statistical coverage peak detection using negative binomial distribution
 Identifies statistically significant coverage enrichments in ONT sequencing data
+FIXED VERSION: No redundant window calculations for plotting
 """
 
 import numpy as np
@@ -67,18 +68,29 @@ class CoveragePeakCaller:
             for i, name in enumerate(self.bam.references):
                 self.chrom_lengths[name] = self.bam.lengths[i]
         
+        # CACHE for storing windows and distribution parameters
+        self.cached_windows = {}
+        self.cached_distributions = {}
+        
         print(f"Initialized peak caller with {len(self.chrom_lengths)} references")
         print(f"Window size: {window_size} bp, Step size: {step_size} bp")
     
     def calculate_coverage_windows(self, chromosome, start=None, end=None):
         """
         Calculate read coverage in sliding windows
+        CACHES results to avoid recalculation
         
         Returns:
         --------
         windows : list of dict
             Each window contains: chr, start, end, coverage, read_count
         """
+        # Check cache first
+        cache_key = f"{chromosome}_{start}_{end}"
+        if cache_key in self.cached_windows:
+            print(f"  Using cached windows for {chromosome}")
+            return self.cached_windows[cache_key]
+        
         if chromosome not in self.chrom_lengths:
             raise ValueError(f"Chromosome {chromosome} not found in reference")
         
@@ -122,6 +134,8 @@ class CoveragePeakCaller:
                 'length': window_length
             })
         
+        # Cache the results
+        self.cached_windows[cache_key] = windows
         return windows
     
     def fit_negative_binomial(self, coverage_values):
@@ -225,9 +239,10 @@ class CoveragePeakCaller:
         return np.array(pvalues)
     
     def call_peaks(self, chromosome, fdr_threshold=0.05, min_fold_change=2.0,
-                   min_coverage=5, merge_distance=1000, plot=False):
+                   min_coverage=5, merge_distance=1000, plot=False, plot_file=None):
         """
         Call statistically significant coverage peaks
+        STORES windows and distribution parameters for later plotting
         
         Parameters:
         -----------
@@ -243,6 +258,8 @@ class CoveragePeakCaller:
             Merge peaks within this distance (default: 1000 bp)
         plot : bool
             Generate coverage plot with peaks
+        plot_file : str
+            File to save plot to
         
         Returns:
         --------
@@ -251,7 +268,7 @@ class CoveragePeakCaller:
         """
         print(f"\nAnalyzing {chromosome}...")
         
-        # Calculate coverage windows
+        # Calculate coverage windows (cached)
         windows = self.calculate_coverage_windows(chromosome)
         
         if len(windows) < 10:
@@ -267,6 +284,10 @@ class CoveragePeakCaller:
             print(f"    Mean coverage: {dist_params['mean']:.2f}")
             print(f"    Variance: {dist_params.get('variance', 0):.2f}")
             print(f"    Dispersion: {dist_params.get('dispersion', 0):.4f}")
+            
+            # Cache distribution parameters for plotting
+            self.cached_distributions[chromosome] = dist_params
+            
         except Exception as e:
             print(f"  Error fitting distribution: {e}")
             return []
@@ -282,13 +303,6 @@ class CoveragePeakCaller:
                 alpha=fdr_threshold, 
                 method='fdr_bh'
             )
-            
-            # Alternative: Bonferroni correction (more conservative)
-            # rejected_bonf, adjusted_pvals_bonf, _, _ = multipletests(
-            #     pvalues, 
-            #     alpha=fdr_threshold, 
-            #     method='bonferroni'
-            # )
         else:
             return []
         
@@ -327,9 +341,10 @@ class CoveragePeakCaller:
             peaks = self.merge_peaks(peaks, merge_distance)
             print(f"  Peaks after merging: {len(peaks)}")
         
-        # Plot if requested
-        if plot and HAS_PLOTTING and peaks:
-            self.plot_coverage_peaks(chromosome, windows, peaks, dist_params)
+        # Plot if requested - using CACHED data
+        if plot and HAS_PLOTTING and peaks and plot_file:
+            print(f"  Generating plot: {plot_file}")
+            self.plot_coverage_peaks(chromosome, windows, peaks, dist_params, plot_file)
         
         return peaks
     
@@ -384,14 +399,17 @@ class CoveragePeakCaller:
         
         return merged
     
-    def call_peaks_genome_wide(self, chromosomes=None, **kwargs):
+    def call_peaks_genome_wide(self, chromosomes=None, plot_dir=None, **kwargs):
         """
         Call peaks across all chromosomes
+        FIXED: Generates plots during peak calling to use cached data
         
         Parameters:
         -----------
         chromosomes : list
             Specific chromosomes to analyze (default: all)
+        plot_dir : Path or str
+            Directory to save plots (if plotting enabled)
         **kwargs : 
             Arguments passed to call_peaks()
         
@@ -406,7 +424,16 @@ class CoveragePeakCaller:
         all_peaks = {}
         total_peaks = 0
         
+        # Extract plot setting from kwargs
+        plot_enabled = kwargs.get('plot', False)
+        
         for chrom in chromosomes:
+            # Set up plot file if plotting is enabled
+            plot_file = None
+            if plot_enabled and HAS_PLOTTING and plot_dir:
+                plot_file = Path(plot_dir) / f"{chrom}_coverage_peaks.png"
+                kwargs['plot_file'] = str(plot_file)
+            
             peaks = self.call_peaks(chrom, **kwargs)
             if peaks:
                 all_peaks[chrom] = peaks
@@ -465,17 +492,18 @@ class CoveragePeakCaller:
                            output_file=None):
         """
         Plot coverage profile with called peaks
+        USES CACHED DATA - no recalculation needed
         
         Parameters:
         -----------
         chromosome : str
             Chromosome name
         windows : list
-            Coverage windows
+            Coverage windows (from cache)
         peaks : list
             Called peaks
         dist_params : dict
-            Distribution parameters
+            Distribution parameters (from cache)
         output_file : str
             Save plot to file (optional)
         """
@@ -544,15 +572,15 @@ class CoveragePeakCaller:
         
         if output_file:
             plt.savefig(output_file, dpi=150, bbox_inches='tight')
-            print(f"Plot saved to: {output_file}")
-        else:
-            plt.show()
+            print(f"  Plot saved to: {output_file}")
         
         plt.close()
     
     def close(self):
-        """Close BAM file"""
+        """Close BAM file and clear cache"""
         self.bam.close()
+        self.cached_windows.clear()
+        self.cached_distributions.clear()
 
 
 def main():
@@ -639,33 +667,21 @@ Examples:
     )
     
     # Create plot directory if needed
+    plot_dir = None
     if args.plot:
         plot_dir = Path(args.plot_dir)
         plot_dir.mkdir(exist_ok=True)
     
-    # Call peaks
+    # Call peaks - FIXED: plots generated during peak calling
     peaks = peak_caller.call_peaks_genome_wide(
         chromosomes=args.chromosomes,
+        plot_dir=plot_dir,
         fdr_threshold=args.fdr,
         min_fold_change=args.min_fold,
         min_coverage=args.min_coverage,
         merge_distance=args.merge_distance,
         plot=args.plot
     )
-    
-    # Save plots if requested
-    if args.plot and HAS_PLOTTING:
-        for chrom, chrom_peaks in peaks.items():
-            if chrom_peaks:
-                # Recalculate windows for plotting
-                windows = peak_caller.calculate_coverage_windows(chrom)
-                coverage_values = [w['coverage'] for w in windows]
-                dist_params = peak_caller.fit_negative_binomial(coverage_values)
-                
-                plot_file = plot_dir / f"{chrom}_coverage_peaks.png"
-                peak_caller.plot_coverage_peaks(
-                    chrom, windows, chrom_peaks, dist_params, plot_file
-                )
     
     # Write output
     peak_caller.write_bed(peaks, args.output)
