@@ -50,7 +50,7 @@ circontrack -h
 
      Circular DNA Tracking and Detection via ONT-based Multi-modal Signal Integration 
 
-      Version: 0.3.0 
+      Version: 0.4.0 
     
 usage: circontrack [-h] [-o OUTPUT] [-c CHROMOSOME] [-q] [--log-level {DEBUG,INFO,WARNING,ERROR}] [--min-fold-enrichment MIN_FOLD_ENRICHMENT] [--min-coverage MIN_COVERAGE] [--min-length MIN_LENGTH]
                    [--max-length MAX_LENGTH] [--min-confidence MIN_CONFIDENCE]
