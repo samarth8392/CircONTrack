@@ -10,7 +10,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="CircONTrack",
-    version="0.3.0",  # Bumped version for new features
+    version="0.4.0",  # Bumped version for new features
     author="Samarth Mathur, PhD",
     author_email="samarth8392@gmail.com",
     description="ONT-optimized circular DNA detection with viral classification and assembly preparation",
@@ -30,15 +30,18 @@ setup(
     install_requires=[
         "pysam>=0.19.0",
         "numpy>=1.19.0",
+        "pandas>=1.0.0",
         "scipy>=1.6.0",
         "tqdm>=4.60.0",
         "rich>=10.0.0",
+        "statsmodels>=0.12.0",
     ],
     entry_points={
         "console_scripts": [
             "circontrack=circDNA_detection.circular_dna_detector:main",
             "circontrack-classify=circDNA_detection.classify:main",
             "circontrack-assemble=circDNA_detection.assemble:main",
+            "circontrack-peaks=circDNA_detection.coverage_peaks:main",
         ],
     },
     project_urls={
