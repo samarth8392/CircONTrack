@@ -1,0 +1,77 @@
+<section>
+  <h2>CircONTrack Coverage Peaks</h2>
+  <p>Detecting statistically significant peaks in sequencing coverage</p>
+</section>
+
+<section>
+  <h3>The Goal</h3>
+  <p>Find "mountains" in sequencing read coverage that stand out above normal variation.</p>
+</section>
+
+<section>
+  <h3>Core Idea</h3>
+  <ul>
+    <li>Genome split into sliding windows</li>
+    <li>Measure coverage per window</li>
+    <li>Model background variation</li>
+    <li>Find statistically enriched windows (peaks)</li>
+  </ul>
+</section>
+
+<section>
+  <h3>Step 1: Input</h3>
+  <ul>
+    <li>BAM file (aligned ONT reads)</li>
+    <li>Optional reference FASTA (chromosome lengths)</li>
+  </ul>
+</section>
+
+<section>
+  <h3>Step 2: Sliding Windows</h3>
+  <p>Default: 1000 bp window, step 500 bp</p>
+  <p>For each window: count reads, sum coverage</p>
+</section>
+
+<section>
+  <h3>Step 3: Background Model</h3>
+  <p>Coverage is noisy → Negative Binomial fits better than Poisson.</p>
+  <pre>
+Variance > Mean → Negative Binomial
+Variance ≤ Mean → Poisson
+  </pre>
+</section>
+
+<section>
+  <h3>Step 4: Statistical Testing</h3>
+  <p>For each window: probability of seeing this coverage by chance</p>
+  <ul>
+    <li>Negative Binomial survival function</li>
+    <li>One-tailed test for enrichment</li>
+  </ul>
+</section>
+
+<section>
+  <h3>Step 5: Multiple Testing</h3>
+  <p>Use Benjamini-Hochberg FDR correction to avoid false positives.</p>
+</section>
+
+<section>
+  <h3>Step 6: Biological Filters</h3>
+  <ul>
+    <li>Min fold change</li>
+    <li>Min coverage</li>
+  </ul>
+</section>
+
+<section>
+  <h3>Step 7: Merge Peaks</h3>
+  <p>Combine peaks within a given merge distance</p>
+</section>
+
+<section>
+  <h3>Output</h3>
+  <ul>
+    <li>BED file with peak coordinates</li>
+    <li>Optional plots showing coverage, p-values, fold-change</li>
+  </ul>
+</section>

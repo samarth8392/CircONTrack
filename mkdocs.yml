@@ -25,6 +25,7 @@ nav:
   - User Guide:
     - Overview: pipeline_overview.md
     - Pipeline: pipeline_flowchart.md
+    - Coverage Peaks: coverage_peaks.md
     - Classify: classify_usage.md
     - Assemble: assemble.md
   - Algorithm:
