@@ -31,6 +31,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install pytest pytest-cov
         pip install pysam numpy scipy tqdm rich
+        pip install mkdocs-revealjs
     
     - name: Run unit tests
       run: |
