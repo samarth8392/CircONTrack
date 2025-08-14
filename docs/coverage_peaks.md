@@ -98,5 +98,5 @@ circontrack-peaks sample.bam -r reference.fa \
 
 ## Coverage Peaks Presentation
 
-<iframe src="./coverage_peaks_slides.html" width="100%" height="600px" style="border:none;">
+<iframe src="../docs/coverage_peak_slides.html" width="100%" height="600px" style="border:none;">
 </iframe>

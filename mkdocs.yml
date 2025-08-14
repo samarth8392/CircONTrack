@@ -75,6 +75,7 @@ extra_javascript:
 # Plugins
 plugins:
   - search
+  - revealjs
   - git-revision-date-localized:
       type: date
 
