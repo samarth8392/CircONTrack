@@ -35,6 +35,8 @@ setup(
         "tqdm>=4.60.0",
         "rich>=10.0.0",
         "statsmodels>=0.12.0",
+        "matplotlib>=3.3.0",
+        "seaborn>=0.11.0",
     ],
     entry_points={
         "console_scripts": [
@@ -42,6 +44,7 @@ setup(
             "circontrack-classify=circDNA_detection.classify:main",
             "circontrack-assemble=circDNA_detection.assemble:main",
             "circontrack-peaks=circDNA_detection.coverage_peaks:main",
+            "circontrack-peakout=circDNA_detection.coverage_peakout:main",
         ],
     },
     project_urls={
