@@ -75,39 +75,54 @@ class CircONTrackPeakAnalyzer:
         chr, start, end, name, score, strand, coverage, fold_change, pvalue, adjusted_pvalue, read_count
         """
         try:
-            # Try to detect if file has header
-            with open(self.peak_file, 'r') as f:
-                first_line = f.readline().strip()
-            
-            # Standard CircONTrack peak output columns
-            columns = ['chr', 'start', 'end', 'name', 'score', 'strand', 
-                      'coverage', 'fold_change', 'pvalue', 'adjusted_pvalue', 'read_count']
-            
-            # Check if first line looks like header
-            has_header = not (first_line.split('\t')[1].isdigit())
-            
-            # Load the data
+            # Read the file, skipping comment lines that start with #
             peaks = pd.read_csv(
                 self.peak_file, 
                 sep='\t', 
-                names=None if has_header else columns,
                 comment='#',
                 low_memory=False
             )
             
-            # Ensure we have the right columns
-            if has_header:
-                # Map common header variations to standard names
-                column_mapping = {
-                    'chromosome': 'chr', 'chrom': 'chr',
-                    'start_pos': 'start', 'begin': 'start',
-                    'end_pos': 'end', 'stop': 'end',
-                    'fold_enrichment': 'fold_change',
-                    'p_value': 'pvalue', 'pval': 'pvalue',
-                    'adj_pvalue': 'adjusted_pvalue', 'padj': 'adjusted_pvalue',
-                    'fdr': 'adjusted_pvalue'
-                }
-                peaks.rename(columns=column_mapping, inplace=True)
+            # The file has a header row that starts with #chr, but pandas read_csv with comment='#'
+            # will skip it, so we need to manually set column names
+            expected_columns = ['chr', 'start', 'end', 'name', 'score', 'strand', 
+                              'coverage', 'fold_change', 'pvalue', 'adjusted_pvalue', 'read_count']
+            
+            # If we don't have the right number of columns, something is wrong
+            if len(peaks.columns) != len(expected_columns):
+                self.logger.warning(f"Expected {len(expected_columns)} columns, got {len(peaks.columns)}")
+                self.logger.info(f"Columns found: {list(peaks.columns)}")
+                
+                # Try reading without skipping comments to see the actual header
+                peaks_with_header = pd.read_csv(self.peak_file, sep='\t', nrows=1)
+                self.logger.info(f"Header from file: {list(peaks_with_header.columns)}")
+                
+                # Re-read skipping the header line manually
+                peaks = pd.read_csv(
+                    self.peak_file, 
+                    sep='\t', 
+                    skiprows=1,  # Skip the header line
+                    names=expected_columns,
+                    low_memory=False
+                )
+            else:
+                # Set the correct column names
+                peaks.columns = expected_columns
+            
+            # Verify we have all required columns
+            required_cols = ['chr', 'start', 'end', 'coverage', 'fold_change', 'pvalue', 'adjusted_pvalue', 'read_count']
+            missing_cols = [col for col in required_cols if col not in peaks.columns]
+            if missing_cols:
+                raise ValueError(f"Missing required columns: {missing_cols}")
+            
+            self.logger.info(f"Columns after processing: {list(peaks.columns)}")
+            self.logger.info(f"Data types: {peaks.dtypes}")
+            
+            # Ensure numeric columns are properly typed
+            numeric_cols = ['start', 'end', 'score', 'coverage', 'fold_change', 'pvalue', 'adjusted_pvalue', 'read_count']
+            for col in numeric_cols:
+                if col in peaks.columns:
+                    peaks[col] = pd.to_numeric(peaks[col], errors='coerce')
             
             # Add derived columns for analysis
             peaks['length'] = peaks['end'] - peaks['start']

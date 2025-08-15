@@ -3,7 +3,7 @@
 CircONTrack: ONT-optimized Circular DNA Detection Pipeline
 """
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 __author__ = "Samarth Mathur, PhD"
 __email__ = "samarth8392@gmail.com"
 
