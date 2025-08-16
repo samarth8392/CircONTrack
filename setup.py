@@ -10,7 +10,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="CircONTrack",
-    version="0.5.1",  # Bumped version for new features
+    version="0.6.0",  # Bumped version for new features
     author="Samarth Mathur, PhD",
     author_email="samarth8392@gmail.com",
     description="ONT-optimized circular DNA detection with viral classification and assembly preparation",
@@ -45,6 +45,7 @@ setup(
             "circontrack-assemble=circDNA_detection.assemble:main",
             "circontrack-peaks=circDNA_detection.coverage_peaks:main",
             "circontrack-peakout=circDNA_detection.coverage_peakout:main",
+            "circontrack-validate=circDNA_detection.circontrack_validate:main",
         ],
     },
     project_urls={
