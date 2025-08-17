@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./docs/img/CircONTrack_logo_small.png" width="1000">
+</p>
+
 # CircONTrack
 
 **ONT-optimized circular DNA detection with viral/host classification via multi-modal analysis combining coverage patterns, junction detection, and split-read analysis.**
