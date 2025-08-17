@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="./docs/img/CircONTrack_logo_small.png" width="1000">
-</p>
+<img src="./docs/img/CircONTrack_logo_small.png" width="1000">
 
 # CircONTrack
 
