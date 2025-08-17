@@ -1,10 +1,14 @@
-# circDNA Detection
+<p align="center">
+  <img src="./docs/img/CircONTrack_logo.png" width="1000">
+</p>
+
+# CircONTrack
 
 **ONT-optimized circular DNA detection via multi-modal analysis combining coverage patterns, junction detection, and split-read analysis.**
 
 ## Overview
 
-circDNA Detection is a specialized tool designed for identifying circular DNA elements in Oxford Nanopore Technologies (ONT) long-read sequencing data. The package employs a sophisticated multi-modal approach that combines multiple detection strategies to achieve high sensitivity and specificity.
+CircONTrack is a specialized tool designed for identifying circular DNA elements in Oxford Nanopore Technologies (ONT) long-read sequencing data. The package employs a sophisticated multi-modal approach that combines multiple detection strategies to achieve high sensitivity and specificity.
 
 ## Key Features
 
