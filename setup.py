@@ -10,7 +10,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="CircONTrack",
-    version="0.7.0",  # Bumped version for new features
+    version="0.7.1",  # Bumped version for new features
     author="Samarth Mathur, PhD",
     author_email="samarth8392@gmail.com",
     description="ONT-optimized circular DNA detection with viral classification and assembly preparation",
