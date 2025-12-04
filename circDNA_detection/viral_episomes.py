@@ -209,18 +209,38 @@ class ViralEpisomeDetector:
         return result
     
     def _calculate_coverage(self, contig: str, bin_size: int = 100) -> Dict:
-        """Calculate coverage statistics across viral contig"""
-        
-        contig_length = self.reference.get_reference_length(contig)
-        
-        # Calculate per-position coverage
-        coverage_array = np.zeros(contig_length, dtype=np.int32)
+        """Calculate coverage statistics across viral contig using binned approach"""
         
         try:
-            for pileup_column in self.bam.pileup(contig, 0, contig_length, 
-                                                  truncate=True, 
-                                                  max_depth=100000):
-                coverage_array[pileup_column.pos] = pileup_column.n
+            contig_length = self.reference.get_reference_length(contig)
+        except KeyError:
+            print(f"Warning: Contig {contig} not found in reference")
+            return {
+                'coverage_array': np.array([]),
+                'mean_coverage': 0,
+                'median_coverage': 0,
+                'std_coverage': 0,
+                'cv': 0,
+                'uniformity_score': 0
+            }
+        
+        # Use binned coverage calculation (more robust than per-position)
+        num_bins = max(1, contig_length // bin_size)
+        actual_bin_size = contig_length // num_bins
+        coverage_bins = []
+        
+        try:
+            for i in range(num_bins):
+                bin_start = i * actual_bin_size
+                bin_end = min((i + 1) * actual_bin_size, contig_length)
+                
+                # Count reads in this bin
+                bin_coverage = self.bam.count(contig, bin_start, bin_end)
+                # Normalize by bin size to get coverage depth
+                coverage_bins.append(bin_coverage / (bin_end - bin_start))
+            
+            coverage_array = np.array(coverage_bins)
+            
         except Exception as e:
             print(f"Warning: Error calculating coverage for {contig}: {e}")
             return {
