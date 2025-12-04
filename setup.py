@@ -46,6 +46,7 @@ setup(
             "circontrack-peaks=circDNA_detection.coverage_peaks:main",
             "circontrack-peakout=circDNA_detection.coverage_peakout:main",
             "circontrack-validate=circDNA_detection.circontrack_validate:main",
+            "circontrack-viral-episomes=circDNA_detection.viral_episomes:main"
         ],
     },
     project_urls={
