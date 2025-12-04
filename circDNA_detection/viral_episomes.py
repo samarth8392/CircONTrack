@@ -15,7 +15,10 @@ import argparse
 import sys
 import os
 from pathlib import Path
-from circDNA_detection import __version__
+
+__version__ = "1.0.0"
+__author__ = "CircONTrack Development Team"
+
 
 class ViralEpisomeDetector:
     """
@@ -234,10 +237,18 @@ class ViralEpisomeDetector:
                 bin_start = i * actual_bin_size
                 bin_end = min((i + 1) * actual_bin_size, contig_length)
                 
-                # Count reads in this bin
-                bin_coverage = self.bam.count(contig, bin_start, bin_end)
-                # Normalize by bin size to get coverage depth
-                coverage_bins.append(bin_coverage / (bin_end - bin_start))
+                # Calculate actual coverage depth using pileup
+                bin_depths = []
+                for pileup_column in self.bam.pileup(contig, bin_start, bin_end, 
+                                                      truncate=True, max_depth=100000):
+                    if bin_start <= pileup_column.pos < bin_end:
+                        bin_depths.append(pileup_column.n)
+                
+                # Mean depth for this bin
+                if bin_depths:
+                    coverage_bins.append(np.mean(bin_depths))
+                else:
+                    coverage_bins.append(0)
             
             coverage_array = np.array(coverage_bins)
             
