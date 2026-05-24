@@ -230,8 +230,8 @@ class CoverageAnalyzer:
         return left_boundary, right_boundary
     
     def _calculate_flanking_background(self, coverage, start_idx, end_idx, baseline):
-        """Calculate background coverage from flanking regions"""
-        region_size = end_idx - start_idx
+        """Calculate background coverage from non-overlapping flanking windows."""
+        region_size = end_idx - start_idx + 1
         flank_size = min(region_size, 20)
         
         # Left flank
@@ -239,8 +239,8 @@ class CoverageAnalyzer:
         left_flank = coverage[left_start:start_idx]
         
         # Right flank
-        right_end = min(len(coverage), end_idx + flank_size)
-        right_flank = coverage[end_idx:right_end]
+        right_end = min(len(coverage), end_idx + 1 + flank_size)
+        right_flank = coverage[end_idx + 1:right_end]
         
         # Combine flanks
         flanking_values = np.concatenate([left_flank, right_flank])

@@ -23,7 +23,9 @@ nav:
   - Getting Started:
     - Installation: installation.md
   - User Guide:
+    - Architecture: architecture.md
     - Overview: pipeline_overview.md
+    - Scientific Methodology: scientific_methodology.md
     - Pipeline: pipeline_flowchart.md
     - Coverage Peaks: coverage_peaks.md
     - Classify: classify_usage.md

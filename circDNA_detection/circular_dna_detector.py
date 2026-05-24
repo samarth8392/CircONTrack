@@ -10,8 +10,14 @@ import argparse
 from tqdm import tqdm
 import pysam
 import numpy as np
-from rich.console import Console
-from rich.text import Text
+try:
+    from rich.console import Console
+except ImportError:
+    class Console:
+        """Small fallback used when rich is not installed."""
+
+        def print(self, *args, **kwargs):
+            print(*args)
 
 # Import detection modules
 from .coverage_analyzer import CoverageAnalyzer
@@ -26,7 +32,7 @@ console = Console()
 
 def print_banner():
     """Print ASCII banner"""
-    banner = f"""
+    banner = rf"""
     [cyan]
    _____ _           ____  _   _ _______             _    
   / ____(_)         / __ \| \ | |__   __|           | |   
@@ -82,7 +88,7 @@ class CircularDNADetector:
         self.logger = logging.getLogger(__name__)
         
     def detect_circular_dna(self, bam_file, reference_file, output_file=None, 
-                          chromosome=None):
+                          chromosome=None, report_file=None, plot_dir=None):
         """
         Main detection pipeline
         """
@@ -91,7 +97,7 @@ class CircularDNADetector:
         
         try:
             # Validate inputs
-            self._validate_inputs(bam_file, reference_file)
+            self._validate_inputs(bam_file, reference_file, chromosome)
             
             # Run individual detection methods
             self.logger.info("Running coverage analysis...")
@@ -138,6 +144,29 @@ class CircularDNADetector:
             # Write output if requested
             if output_file:
                 self._write_output(final_candidates, output_file)
+
+            # Optional report/plot outputs are generated from final structured
+            # candidates only; they do not alter detection or scoring.
+            if report_file:
+                from .reporting import write_markdown_report
+                write_markdown_report(
+                    final_candidates,
+                    report_file,
+                    run_metadata={
+                        "bam_file": bam_file,
+                        "reference_file": reference_file,
+                        "chromosome": chromosome or "all",
+                        "min_fold_enrichment": self.min_fold_enrichment,
+                        "min_coverage": self.min_coverage,
+                        "min_length": self.min_length,
+                        "max_length": self.max_length,
+                        "min_confidence": self.min_confidence,
+                    },
+                )
+
+            if plot_dir:
+                from .reporting import write_plot_bundle
+                write_plot_bundle(final_candidates, plot_dir)
             
             # Print summary
             self._print_summary(
@@ -151,13 +180,18 @@ class CircularDNADetector:
             self.logger.error(f"Error in detection pipeline: {str(e)}")
             raise
     
-    def _validate_inputs(self, bam_file, reference_file):
+    def _validate_inputs(self, bam_file, reference_file, chromosome=None):
         """Validate input files"""
         # Check BAM file
         try:
             with pysam.AlignmentFile(bam_file, 'rb') as bam:
                 if not bam.has_index():
-                    self.logger.warning("BAM file is not indexed, this will be slow")
+                    raise ValueError(
+                        "BAM file must be coordinate-sorted and indexed "
+                        "(.bai or .csi) because CircONTrack uses random-access fetches"
+                    )
+                if chromosome and chromosome not in bam.references:
+                    raise ValueError(f"Chromosome '{chromosome}' not found in BAM header")
                 self.logger.info(f"✓ BAM file validated: {bam_file}")
         except Exception as e:
             raise ValueError(f"Invalid BAM file: {str(e)}")
@@ -297,6 +331,8 @@ def main():
     parser.add_argument('reference_file', help='Reference FASTA file')
     parser.add_argument('-o', '--output', help='Output BED file', 
                        default='circular_dna_results.bed')
+    parser.add_argument('--report', help='Optional Markdown report file')
+    parser.add_argument('--plot-dir', help='Optional directory for summary plots')
     parser.add_argument('-c', '--chromosome', help='Analyze specific chromosome only')
     parser.add_argument('-q', '--quiet', action='store_true', 
                        help='Disable verbose output (quiet mode)')
@@ -333,7 +369,9 @@ def main():
         args.bam_file,
         args.reference_file,
         args.output,
-        args.chromosome
+        args.chromosome,
+        report_file=args.report,
+        plot_dir=args.plot_dir
     )
     
     console.print(f"\nAnalysis complete! Results written to {args.output}", style="bold green")

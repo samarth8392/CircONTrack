@@ -8,6 +8,8 @@ This module is part of the CircONTrack suite for circular DNA detection and anal
 
 import pandas as pd
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
@@ -75,18 +77,19 @@ class CircONTrackPeakAnalyzer:
         chr, start, end, name, score, strand, coverage, fold_change, pvalue, adjusted_pvalue, read_count
         """
         try:
-            # Read the file, skipping comment lines that start with #
+            # Read the file, skipping comment lines that start with #.
+            # CircONTrack peak files use a commented header, so force explicit
+            # names to avoid treating the first data row as the header.
+            expected_columns = ['chr', 'start', 'end', 'name', 'score', 'strand', 
+                              'coverage', 'fold_change', 'pvalue', 'adjusted_pvalue', 'read_count']
             peaks = pd.read_csv(
                 self.peak_file, 
                 sep='\t', 
                 comment='#',
+                header=None,
+                names=expected_columns,
                 low_memory=False
             )
-            
-            # The file has a header row that starts with #chr, but pandas read_csv with comment='#'
-            # will skip it, so we need to manually set column names
-            expected_columns = ['chr', 'start', 'end', 'name', 'score', 'strand', 
-                              'coverage', 'fold_change', 'pvalue', 'adjusted_pvalue', 'read_count']
             
             # If we don't have the right number of columns, something is wrong
             if len(peaks.columns) != len(expected_columns):
@@ -105,10 +108,6 @@ class CircONTrackPeakAnalyzer:
                     names=expected_columns,
                     low_memory=False
                 )
-            else:
-                # Set the correct column names
-                peaks.columns = expected_columns
-            
             # Verify we have all required columns
             required_cols = ['chr', 'start', 'end', 'coverage', 'fold_change', 'pvalue', 'adjusted_pvalue', 'read_count']
             missing_cols = [col for col in required_cols if col not in peaks.columns]
@@ -280,38 +279,65 @@ class CircONTrackPeakAnalyzer:
                 output_dir = Path(output_dir)
                 output_dir.mkdir(exist_ok=True)
             
-            # Set style for CircONTrack consistency
-            plt.style.use('default')  # Use default matplotlib style
-            sns.set_palette("husl")
+            # Deterministic, colorblind-aware style for headless reports.
+            plt.style.use('default')
+            sns.set_palette("colorblind")
             
-            # Create figure with subplots
-            fig = plt.figure(figsize=(20, 16))
-            
-            # [Rest of the plotting code remains the same as in original script]
-            # ... (keeping all the subplot code identical)
-            
+            fig, axes = plt.subplots(2, 2, figsize=(12, 9))
+            ax1, ax2, ax3, ax4 = axes.ravel()
+
             # 1. Chromosome distribution
-            ax1 = plt.subplot(3, 3, 1)
             chrom_counts = self.peaks['chr'].value_counts().sort_index()
-            ax1.bar(range(len(chrom_counts)), chrom_counts.values)
+            ax1.bar(range(len(chrom_counts)), chrom_counts.values, color='#0072B2')
             ax1.set_xticks(range(len(chrom_counts)))
             ax1.set_xticklabels(chrom_counts.index, rotation=45, ha='right')
             ax1.set_xlabel('Chromosome')
             ax1.set_ylabel('Number of Peaks')
             ax1.set_title('Peak Distribution Across Chromosomes')
-            
-            # [Continue with all other subplot code...]
-            # (I'm truncating this for brevity, but include all the original plotting code)
-            
-            plt.suptitle('CircONTrack Peak Analysis Summary', fontsize=16, y=1.02)
-            plt.tight_layout()
+
+            # 2. Peak length distribution
+            ax2.hist(self.peaks['length'].dropna(), bins=30, color='#009E73', edgecolor='white')
+            ax2.set_xlabel('Peak length (bp)')
+            ax2.set_ylabel('Number of peaks')
+            ax2.set_title('Peak Length Distribution')
+
+            # 3. Fold change versus adjusted p-value
+            ax3.scatter(
+                self.peaks['fold_change'],
+                self.peaks['log10_adj_pvalue'],
+                s=24,
+                alpha=0.75,
+                color='#D55E00',
+                edgecolors='none'
+            )
+            ax3.set_xlabel('Fold change over background')
+            ax3.set_ylabel('-log10(adjusted p-value)')
+            ax3.set_title('Coverage Enrichment Significance')
+            ax3.grid(True, alpha=0.25)
+
+            # 4. Coverage versus read count
+            ax4.scatter(
+                self.peaks['coverage'],
+                self.peaks['read_count'],
+                s=24,
+                alpha=0.75,
+                color='#CC79A7',
+                edgecolors='none'
+            )
+            ax4.set_xlabel('Mean coverage (x)')
+            ax4.set_ylabel('Read count')
+            ax4.set_title('Peak Coverage Support')
+            ax4.grid(True, alpha=0.25)
+
+            fig.suptitle('CircONTrack Peak Analysis Summary', fontsize=14)
+            fig.tight_layout()
             
             if output_dir:
                 output_path = output_dir / 'peak_analysis_summary.png'
-                plt.savefig(output_path, dpi=150, bbox_inches='tight')
+                fig.savefig(output_path, dpi=150, bbox_inches='tight')
                 self.logger.info(f"Summary plot saved to {output_path}")
             
-            plt.show()
+            plt.close(fig)
             return fig
             
         except Exception as e:

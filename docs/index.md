@@ -2,18 +2,18 @@
 
 # CircONTrack
 
-**ONT-optimized circular DNA detection with viral/host classification via multi-modal analysis combining coverage patterns, junction detection, and split-read analysis.**
+**ONT-oriented circular DNA candidate detection with viral/host classification via multi-modal analysis combining coverage patterns, junction detection, and split-read analysis.**
 
 ## Overview
 
-CircONTrack is a specialized tool for identifying and classifying circular DNA elements in Oxford Nanopore Technologies (ONT) long-read sequencing data. The package employs a sophisticated multi-modal approach to detect circular DNA and can distinguish between host eccDNA, viral episomes, and integration sites.
+CircONTrack is a tool for identifying and classifying candidate circular DNA intervals in Oxford Nanopore Technologies (ONT) long-read sequencing data. The package combines multiple implemented evidence streams and can classify candidate intervals as host-like, viral-like, mixed, or integration-like when an appropriate combined reference is supplied.
 
 ## Key Features
 
 - **Multi-modal detection**: Combines coverage analysis, junction detection, and split-read analysis
 - **ONT-optimized**: Specifically designed for long-read sequencing characteristics
 - **Viral/host classification**: Identifies viral episomes, integration sites, and host eccDNA
-- **High sensitivity**: Detects circular DNA elements with configurable thresholds  
+- **Configurable thresholds**: Exposes coverage and confidence parameters for exploratory or conservative analyses
 - **Comprehensive scoring**: Multi-evidence confidence scoring system
 - **Standard output**: Results in BED format with detailed annotations
 
@@ -56,7 +56,7 @@ samtools index sample.bam
 # Basic detection with default parameters
 circontrack sample.bam mm10_plus_viral.fa -o circdna.bed
 
-# Recommended parameters for comprehensive detection
+# Example parameter override for exploratory analysis
 circontrack sample.bam mm10_plus_viral.fa \
   --min-fold-enrichment 2.0 \
   --min-coverage 10 \
@@ -94,10 +94,10 @@ circontrack sample.bam reference.fa \
 
 | Target Type | min-fold-enrichment | min-coverage | min-length | Use Case |
 |------------|-------------------|--------------|------------|----------|
-| **High-confidence eccDNA** | 5.0 | 20 | 1000 | Conservative, low false positives |
-| **Comprehensive detection** | 2.0 | 10 | 200 | Balanced sensitivity/specificity |
-| **Viral episomes** | 1.5 | 5 | 100 | Detect small viral circles |
-| **Large eccDNA/amplicons** | 3.0 | 15 | 10000 | Focus on large circles |
+| Exploratory small candidates | 1.5 | 5 | 200 | Lower evidence threshold for inspection |
+| Moderate coverage enrichment | 2.0 | 10 | 200 | Example stricter coverage settings |
+| Strong coverage enrichment | 5.0 | 20 | 1000 | Example conservative coverage settings |
+| Large candidate focus | 3.0 | 15 | 10000 | Example settings for larger intervals |
 
 ### Classification Usage
 
@@ -122,9 +122,9 @@ circontrack-classify circdna.bed reference.fa aligned.bam \
 ### Detection Output (BED)
 
 ```
-#chrom  start    end      name        score  strand  method    length  fold_enrichment  confidence
-chr19   1000000  1005000  circDNA_1   850    .       coverage  5000    3.5             0.85
-NC_029549 0      15234    circDNA_2   950    .       junction  15234   8.2             0.95
+# chr  start    end      name        confidence  strand  method      length  gc_content
+chr19  1000000  1005000  circDNA_1   0.850       .       coverage    5000    0.421
+chr3   2000000  2000800  circDNA_2   0.640       .       junction    800     0.512
 ```
 
 ### Classification Output
@@ -178,11 +178,7 @@ cat final_results_summary.txt
 
 ### Confidence Scores
 
-- **0.9-1.0**: Very high confidence
-- **0.7-0.9**: High confidence  
-- **0.5-0.7**: Moderate confidence
-- **0.3-0.5**: Low confidence
-- **<0.3**: Filtered by default
+The confidence score is an implemented evidence-integration score between 0 and 1. It is useful for ranking candidates within a run, but it is not a calibrated probability unless benchmarked externally. Scores below the default threshold of 0.3 are filtered by the primary command.
 
 ## Performance Tips
 
@@ -202,7 +198,7 @@ circontrack sample.bam ref.fa \
 
 ## Requirements
 
-- Python ≥ 3.7
+- Python ≥ 3.10
 - pysam ≥ 0.19.0
 - numpy ≥ 1.19.0
 - scipy ≥ 1.6.0
@@ -211,9 +207,9 @@ circontrack sample.bam ref.fa \
 
 | Issue | Solution |
 |-------|----------|
-| No circles detected | Lower `--min-fold-enrichment` to 1.5 |
-| Too many false positives | Increase `--min-coverage` to 15-20 |
-| Missing small circles | Decrease `--min-length` to 100 |
+| No candidates detected | Inspect coverage, junction, and split-read evidence; lower thresholds only for exploratory analysis |
+| Many candidates | Increase `--min-confidence` or coverage thresholds and inspect evidence summaries |
+| Missing small intervals | Note that module-specific hard-coded length checks may still apply |
 | Missing viral contigs | Check reference includes viral sequences |
 | Classification not working | Ensure viral contigs start with NC_, NR_, or use `--viral-patterns` |
 

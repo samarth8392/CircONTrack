@@ -159,17 +159,19 @@ class CircONTrackValidator:
         self.logger.info(f"Loading peaks from {peak_file}")
         
         try:
-            # Read the file, skipping comment lines that start with #
+            # Read the file, skipping comment lines that start with #.
+            # CircONTrack peak files use a commented header; explicit names keep
+            # the first data row from being consumed as a pandas header.
+            expected_columns = ['chr', 'start', 'end', 'name', 'score', 'strand', 
+                              'coverage', 'fold_change', 'pvalue', 'adjusted_pvalue', 'read_count']
             peaks = pd.read_csv(
                 peak_file, 
                 sep='\t', 
                 comment='#',
+                header=None,
+                names=expected_columns,
                 low_memory=False
             )
-            
-            # Expected CircONTrack peak output columns
-            expected_columns = ['chr', 'start', 'end', 'name', 'score', 'strand', 
-                              'coverage', 'fold_change', 'pvalue', 'adjusted_pvalue', 'read_count']
             
             # Handle header detection and column assignment
             if len(peaks.columns) != len(expected_columns):
@@ -187,9 +189,6 @@ class CircONTrackValidator:
                     names=expected_columns,
                     low_memory=False
                 )
-            else:
-                peaks.columns = expected_columns
-            
             # Ensure numeric columns are properly typed
             numeric_cols = ['start', 'end', 'score', 'coverage', 'fold_change', 'pvalue', 'adjusted_pvalue', 'read_count']
             for col in numeric_cols:

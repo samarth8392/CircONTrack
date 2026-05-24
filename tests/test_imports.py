@@ -4,6 +4,9 @@ Basic import and functionality tests for CircONTrack
 """
 
 import pytest
+
+pytest.importorskip("pysam")
+
 from circDNA_detection.utils import CircularCandidate, filter_candidates_by_confidence, calculate_gc_content
 from circDNA_detection.confidence_scorer import ConfidenceScorer, MultiMethodIntegrator
 

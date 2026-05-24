@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `circontrack` is a Python tool specifically designed for detecting circular DNA elements in Oxford Nanopore Technologies (ONT) long-read sequencing data. The package employs a multi-modal approach that combines three complementary detection methods to achieve high sensitivity and specificity.
+The `circontrack` command is a Python workflow for detecting candidate circular DNA intervals in Oxford Nanopore Technologies (ONT) long-read sequencing data. The package combines three implemented evidence streams: coverage patterns, junction-like signatures, and split-read signatures. This repository does not provide benchmarked sensitivity or specificity estimates.
 
 ## Package Architecture
 
@@ -29,9 +29,9 @@ The package implements a comprehensive detection pipeline that consists of four 
 
 **Uses median and MAD (Median Absolute Deviation) instead of mean/standard deviation for robustness against outliers**
 
-**Implementation Logic Assessment**: 
+**Implementation note**:
 
-This approach leverages the fact that circular DNA elements often show increased coverage due to due to rolling circle amplification. The fold-enrichment calculation provides a normalized measure that accounts for varying sequencing depths across samples.
+This approach tests for elevated read counts relative to local/background windows. Elevated coverage can be consistent with circular DNA or amplification, but it can also arise from mapping and repetitive-sequence artifacts.
 
 ### 2. Junction Detection
 
@@ -42,8 +42,8 @@ This approach leverages the fact that circular DNA elements often show increased
 - Detects characteristic back-to-back alignments
 - Validates junction signatures through read orientation analysis
 
-**Implementation Logic Assessment**:
-Junction detection is a gold standard for circular DNA identification. The back-to-back signature is a definitive indicator of circular topology, as linear DNA cannot produce such patterns.
+**Implementation note**:
+Junction-like read signatures provide direct evidence for a breakpoint pattern consistent with circular topology. The current implementation uses SA tags, soft clips, and large CIGAR gaps/skips; it does not realign clipped sequence.
 
 ### 3. Split-Read Analysis
 
@@ -54,8 +54,8 @@ Junction detection is a gold standard for circular DNA identification. The back-
 - Identifies split alignments that suggest circular topology
 - Validates split-read patterns consistent with circular DNA structure
 
-**Implementation Logic Assessment**:
-Split-read analysis is particularly powerful for ONT data due to the long read lengths. Reads spanning circular junctions will often show split alignments, providing additional evidence for circular structure.
+**Implementation note**:
+Split-read analysis uses SA-tagged supplementary alignments. These reads can support circular-junction hypotheses, but interpretation depends on alignment quality and repeat context.
 
 ### 4. Multi-Modal Integration
 
@@ -67,8 +67,8 @@ Split-read analysis is particularly powerful for ONT data due to the long read l
 - Filters candidates based on configurable thresholds
 - Outputs results in standard BED format with additional annotation
 
-**Implementation Logic Assessment**:
-✅ **Sound Logic**: The multi-modal approach reduces false positives by requiring multiple lines of evidence. This is particularly important for circular DNA detection, where individual methods may produce artifacts.
+**Implementation note**:
+The integrator merges nearby candidates and scores available evidence. A multi-method candidate has more implemented evidence fields, but the score is not a calibrated probability.
 
 ## Configuration Parameters
 
@@ -76,10 +76,10 @@ Split-read analysis is particularly powerful for ONT data due to the long read l
 
 | Parameter | Default | Purpose | Logic Assessment |
 |-----------|---------|---------|------------------|
-| `min_fold_enrichment` | 1.5 | Minimum coverage fold increase | ✅ Reasonable default; allows detection of moderately amplified circles |
-| `min_coverage` | 5 | Minimum coverage depth | ✅ Prevents noise from low-coverage regions |
-| `min_length` | 200 | Minimum circular DNA length | ✅ Excludes very small artifacts while capturing biologically relevant circles |
-| `max_length` | 100,000 | Maximum circular DNA length | ✅ Reasonable upper bound for most circular DNA elements |
+| `min_fold_enrichment` | 1.5 | Minimum coverage fold increase | Used by coverage detection thresholding |
+| `min_coverage` | 5 | Minimum coverage threshold | Used by coverage detection thresholding |
+| `min_length` | 200 | Minimum circular DNA length | Accepted by CLI; final orchestration does not currently apply an extra length filter |
+| `max_length` | 100,000 | Maximum circular DNA length | Accepted by CLI; module-specific hard-coded checks still apply |
 
 
 ## Output Format
@@ -92,21 +92,21 @@ The package outputs results in BED format with additional columns:
 
 ## Strengths of the Implementation
 
-1. **ONT-Optimized**: Specifically designed for long-read sequencing characteristics
-2. **Multi-Modal Approach**: Reduces false positives through multiple evidence types
+1. **ONT-Oriented Evidence**: Uses signals commonly available in long-read alignments
+2. **Multi-Modal Approach**: Records coverage, junction, and split-read evidence types
 3. **Configurable Thresholds**: Allows adaptation to different experimental conditions
 4. **Comprehensive Scoring**: Provides confidence measures for downstream analysis
 5. **Standard Output**: Uses widely-accepted BED format for compatibility
 
 ## Potential Considerations
 
-1. **Parameter Sensitivity**: The detection accuracy likely depends on appropriate parameter tuning for specific datasets
+1. **Parameter Sensitivity**: Candidate ranking and filtering depend on dataset-specific thresholds
 2. **Computational Complexity**: Multi-modal analysis may be computationally intensive for large datasets
-3. **False Positive Rate**: While multi-modal approach reduces false positives, some background noise may still be present
+3. **Artifact Rate**: Repeats, mapping artifacts, and coverage nonuniformity can produce candidate-like signals
 
 ## Dependencies and Requirements
 
-- Python ≥ 3.7
+- Python ≥ 3.10
 - pysam ≥ 0.19.0 (for BAM/SAM file handling)
 - numpy ≥ 1.19.0 (for numerical computations)
 - scipy ≥ 1.6.0 (for statistical analysis)

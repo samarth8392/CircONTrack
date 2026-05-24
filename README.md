@@ -2,17 +2,17 @@
 
 # CircONTrack
 
-**ONT-optimized circular DNA detection via multi-modal analysis combining coverage patterns, junction detection, and split-read analysis.**
+**ONT-oriented circular DNA candidate detection via multi-modal analysis combining coverage patterns, junction detection, and split-read analysis.**
 
 ## Overview
 
-CircONTrack is a specialized tool designed for identifying circular DNA elements in Oxford Nanopore Technologies (ONT) long-read sequencing data. The package employs a sophisticated multi-modal approach that combines multiple detection strategies to achieve high sensitivity and specificity.
+CircONTrack is a specialized tool designed for identifying candidate circular DNA intervals in Oxford Nanopore Technologies (ONT) long-read sequencing data. The package combines multiple implemented detection strategies; benchmarked accuracy claims should be evaluated separately for each dataset and protocol.
 
 ## Key Features
 
 - **Multi-modal detection**: Combines coverage analysis, junction detection, and split-read analysis
 - **ONT-optimized**: Specifically designed for Oxford Nanopore Technologies long-read sequencing
-- **High sensitivity**: Detects circular DNA elements with configurable thresholds  
+- **Configurable thresholds**: Supports exploratory or stricter evidence thresholds
 - **Comprehensive scoring**: Multi-evidence confidence scoring system
 - **Flexible output**: Results in standard BED format with additional metadata
 
@@ -37,6 +37,11 @@ pip install git+https://github.com/samarth8392/CircONTrack.git
 
 ```bash
 circontrack input.bam reference.fasta -o output.bed
+
+circontrack input.bam reference.fasta \
+  -o output.bed \
+  --report output_report.md \
+  --plot-dir output_plots
 
 circontrack -h
 
@@ -89,10 +94,11 @@ options:
 
 ## Requirements
 
-- Python ≥ 3.7
+- Python ≥ 3.10
 - pysam ≥ 0.19.0
 - numpy ≥ 1.19.0
 - scipy ≥ 1.6.0
+- matplotlib, pandas, rich, statsmodels, and seaborn when using plotting/reporting and companion analysis commands
 
 ## Support
 

@@ -515,21 +515,29 @@ class CoveragePeakCaller:
         positions = np.array([w['start'] for w in windows])
         coverage = np.array([w['coverage'] for w in windows])
         
-        # Create figure
+        # Create deterministic, colorblind-aware figure
+        plt.style.use('default')
+        colors = {
+            'coverage': '#0072B2',
+            'peak': '#D55E00',
+            'pvalue': '#009E73',
+            'fold': '#E69F00',
+            'threshold': '#CC79A7',
+        }
         fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(14, 10), 
                                             height_ratios=[3, 1, 1])
         
         # Main coverage plot
-        ax1.plot(positions, coverage, 'b-', alpha=0.6, linewidth=0.5, 
+        ax1.plot(positions, coverage, color=colors['coverage'], alpha=0.8, linewidth=0.8, 
                 label='Coverage')
         ax1.axhline(y=dist_params['mean'], color='gray', linestyle='--', 
                    alpha=0.5, label=f"Mean: {dist_params['mean']:.1f}")
         
         # Highlight peaks
         for peak in peaks:
-            ax1.axvspan(peak['start'], peak['end'], alpha=0.3, color='red')
+            ax1.axvspan(peak['start'], peak['end'], alpha=0.25, color=colors['peak'])
         
-        ax1.set_ylabel('Coverage (X)')
+        ax1.set_ylabel('Mean coverage (x)')
         ax1.set_title(f'Coverage Profile - {chromosome}')
         ax1.legend()
         ax1.grid(True, alpha=0.3)
@@ -551,8 +559,8 @@ class CoveragePeakCaller:
         pvalues = np.array(pvalues)
         log_pvals = -np.log10(pvalues + 1e-300)
         
-        ax2.plot(positions, log_pvals, 'g-', alpha=0.6, linewidth=0.5)
-        ax2.axhline(y=-np.log10(0.05), color='red', linestyle='--', 
+        ax2.plot(positions, log_pvals, color=colors['pvalue'], alpha=0.8, linewidth=0.8)
+        ax2.axhline(y=-np.log10(0.05), color=colors['threshold'], linestyle='--', 
                    alpha=0.5, label='FDR = 0.05')
         ax2.set_ylabel('-log10(p-value)')
         ax2.legend()
@@ -560,11 +568,11 @@ class CoveragePeakCaller:
         
         # Fold change track
         fold_changes = coverage / dist_params['mean'] if dist_params['mean'] > 0 else coverage
-        ax3.plot(positions, fold_changes, 'orange', alpha=0.6, linewidth=0.5)
-        ax3.axhline(y=2.0, color='red', linestyle='--', alpha=0.5, 
+        ax3.plot(positions, fold_changes, color=colors['fold'], alpha=0.8, linewidth=0.8)
+        ax3.axhline(y=2.0, color=colors['threshold'], linestyle='--', alpha=0.5, 
                    label='2-fold')
-        ax3.set_xlabel(f'Position on {chromosome}')
-        ax3.set_ylabel('Fold Change')
+        ax3.set_xlabel(f'Position on {chromosome} (bp)')
+        ax3.set_ylabel('Fold change')
         ax3.legend()
         ax3.grid(True, alpha=0.3)
         
@@ -575,6 +583,7 @@ class CoveragePeakCaller:
             print(f"  Plot saved to: {output_file}")
         
         plt.close()
+        return fig
     
     def close(self):
         """Close BAM file and clear cache"""
